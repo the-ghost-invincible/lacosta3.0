@@ -1,0 +1,115 @@
+:root {
+  font-family: Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #1d2433;
+  background: #f5f7fb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --bg-page: #f5f7fb;
+  --bg-shell-top: #fffaf5;
+  --bg-surface: #ffffff;
+  --bg-topbar: rgba(255, 255, 255, 0.94);
+  --bg-soft: #f6f8fb;
+  --bg-soft-2: #f9fafc;
+  --bg-soft-3: #f3f6fb;
+  --bg-img: #f9f9f9;
+  --bg-hero-a: #fffaf4;
+  --bg-hero-b: #f2f8ff;
+  --bg-deal-a: #fff7ef;
+  --bg-accent-a: #ffefe4;
+  --bg-accent-soft: #fff1e7;
+  --bg-promo: #feefe7;
+  --border: #edf1f7;
+  --border-2: #e5eaf2;
+  --border-3: #eef1f6;
+  --border-topbar: #eceef3;
+  --border-promo: #f7d4b5;
+  --text-strong: #111827;
+  --text: #1d2433;
+  --text-soft: #354257;
+  --text-muted: #58627a;
+  --text-faint: #64708a;
+  --text-strike: #7c8397;
+  --text-promo: #8a4d22;
+  --btn-bg: #111827;
+  --btn-text: #ffffff;
+  --success-soft: #eafaf0;
+  --success: #0e9a45;
+  --check-soft: #e9fff0;
+  --check: #19a650;
+}
+
+:root[data-theme='dark'] {
+  color: #d6deeb;
+  background: #0b101b;
+
+  --bg-page: #0b101b;
+  --bg-shell-top: #0d1422;
+  --bg-surface: #131a28;
+  --bg-topbar: rgba(19, 26, 40, 0.92);
+  --bg-soft: #1a2233;
+  --bg-soft-2: #161e2e;
+  --bg-soft-3: #1b2334;
+  --bg-img: #151c2b;
+  --bg-hero-a: #16203a;
+  --bg-hero-b: #101726;
+  --bg-deal-a: #181f31;
+  --bg-accent-a: #2b2118;
+  --bg-accent-soft: #2d2116;
+  --bg-promo: #241d14;
+  --border: #232c40;
+  --border-2: #2b3550;
+  --border-3: #262f45;
+  --border-topbar: #232c40;
+  --border-promo: #3a2d1d;
+  --text-strong: #f1f5fb;
+  --text: #d6deeb;
+  --text-soft: #a7b2c6;
+  --text-muted: #8b96ab;
+  --text-faint: #7c879c;
+  --text-strike: #66718a;
+  --text-promo: #e8a06b;
+  --btn-bg: #eef2f9;
+  --btn-text: #0b101b;
+  --success-soft: #12301f;
+  --success: #4ade80;
+  --check-soft: #12301f;
+  --check: #4ade80;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--bg-page);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+img {
+  max-width: 100%;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+}
