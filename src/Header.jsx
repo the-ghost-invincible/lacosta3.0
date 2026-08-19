@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSiteData } from './useSiteData'
 import { useCart } from './CartContext'
+import { useAuth } from './AuthContext'
 import './App.css'
 
 export function categorySlug(name) {
@@ -12,6 +13,7 @@ export function Header() {
   const [theme, setTheme] = useState(() => localStorage.getItem('lacosta-theme') || 'light')
   const { siteContent, catalogProducts, categories, categoryMenus } = useSiteData()
   const { count } = useCart()
+  const { user, loading, login } = useAuth()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -234,7 +236,21 @@ export function Header() {
           </div>
 
           <nav className="top-actions" aria-label="Account actions">
-            <button type="button" className="nav-pill">Login</button>
+            {loading ? (
+              <span className="nav-pill user-pill" style={{ opacity: 0.6 }}>…</span>
+            ) : user ? (
+              <button
+                type="button"
+                className="nav-pill user-pill"
+                aria-label="Account menu"
+                onClick={() => navigate('/account')}
+              >
+                {user.avatar && <img src={user.avatar} alt="" />}
+                <span>@{user.username ?? 'Set username'}</span>
+              </button>
+            ) : (
+              <button type="button" className="nav-pill" onClick={login}>Login</button>
+            )}
             <button type="button" className="nav-pill accent">Sell</button>
             <button
               type="button"
@@ -260,7 +276,10 @@ export function Header() {
         </div>
       </div>
 
-      <MobileNav theme={theme} onToggleTheme={toggleTheme} />
+      <MobileNav theme={theme} onToggleTheme={toggleTheme} onAccountClick={() => {
+    if (user) navigate('/account')
+    else login()
+  }} />
     </>
   )
 }
@@ -346,9 +365,10 @@ export function CategoryNavigation() {
   )
 }
 
-function MobileNav({ theme, onToggleTheme }) {
+function MobileNav({ theme, onToggleTheme, onAccountClick }) {
   const { categories } = useSiteData()
   const { count } = useCart()
+  const { user } = useAuth()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -397,9 +417,9 @@ function MobileNav({ theme, onToggleTheme }) {
           <span className="nav-icon">{theme === 'dark' ? '☀️' : '🌙'}</span>
           Theme
         </button>
-        <button type="button">
+        <button type="button" onClick={onAccountClick}>
           <span className="nav-icon">👤</span>
-          Account
+          {user ? 'Account' : 'Login'}
         </button>
       </nav>
     </>

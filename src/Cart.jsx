@@ -78,7 +78,8 @@ export function CartPage() {
                 <span>Total</span>
                 <span>{formatMoney(total, currency)}</span>
               </div>
-              <button type="button" className="primary-btn cart-checkout-btn">Proceed to checkout</button>
+              <button type="button" className="primary-btn cart-place-order-btn">Place order</button>
+              <button type="button" className="secondary-btn cart-checkout-btn">Proceed to checkout</button>
               <button type="button" className="secondary-btn cart-clear-btn" onClick={clearCart}>
                 Clear cart
               </button>

@@ -274,6 +274,146 @@
   gap: 8px;
 }
 
+.user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.user-pill img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.account-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-2);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.account-card p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.account-profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.account-profile img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border-2);
+}
+
+.account-profile div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-profile strong {
+  font-size: 1.05rem;
+  color: var(--text-strong);
+}
+
+.account-profile small {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.account-username {
+  color: #ff6c1a;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.account-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-actions .primary-btn,
+.account-actions .secondary-btn {
+  width: 100%;
+}
+
+.username-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.username-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-2);
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+}
+
+.username-card h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--text-strong);
+}
+
+.username-card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.username-card input {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-2);
+  background: var(--bg-soft);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.username-card .error {
+  color: #e5484d;
+  font-size: 0.85rem;
+}
+
+.username-card .text-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-decoration: underline;
+}
+
+.username-card .primary-btn {
+  width: 100%;
+}
+
 .promo-strip {
   background: var(--bg-promo);
   border-bottom: 1px solid var(--border-promo);
@@ -1668,6 +1808,11 @@
   color: var(--text-strong);
   font-weight: 800;
   font-size: 0.95rem;
+}
+
+.cart-place-order-btn {
+  width: 100%;
+  margin-top: 12px;
 }
 
 .cart-checkout-btn {

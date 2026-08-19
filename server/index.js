@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import express from 'express'
 import cookieParser from 'cookie-parser'
 import multer from 'multer'
@@ -5,6 +6,8 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { config } from './config.js'
+import { initDb } from './db.js'
+import { authRouter } from './auth.js'
 
 const root = path.resolve(import.meta.dirname, '..')
 const dataFile = path.join(import.meta.dirname, 'data.json')
@@ -47,6 +50,9 @@ function requireAuth(req, res, next) {
 app.get('/api/data', (_req, res) => {
   res.json(readData())
 })
+
+// ---------- Users ----------
+app.use('/api/auth', authRouter)
 
 // ---------- Auth ----------
 app.post('/api/login', (req, res) => {
@@ -124,4 +130,8 @@ if (fs.existsSync(dist)) {
 app.listen(config.port, () => {
   console.log(`Lacosta API + admin running on http://localhost:${config.port}`)
   console.log(`Admin page: http://localhost:${config.port}${config.adminPath}`)
+})
+
+initDb().catch((err) => {
+  console.error('Database init failed — check DATABASE_URL in .env:', err.message)
 })
