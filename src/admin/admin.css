@@ -67,6 +67,13 @@
   align-items: center;
 }
 
+.ngrok-badge {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .admin-tabs {
   display: flex;
   gap: 0.25rem;
@@ -337,6 +344,61 @@
 }
 
 .muted { color: var(--adm-muted); font-size: 0.8rem; }
+
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.status-pending { background: #fef3c7; color: #92400e; }
+.status-confirmed { background: #dbeafe; color: #1e40af; }
+.status-canceled { background: #fee2e2; color: #991b1b; }
+.status-delivered { background: #dcfce7; color: #166534; }
+
+:root[data-theme='dark'] .status-pending { background: #3a2c10; color: #fbbf24; }
+:root[data-theme='dark'] .status-confirmed { background: #14263f; color: #93c5fd; }
+:root[data-theme='dark'] .status-canceled { background: #3c1520; color: #fca5a5; }
+:root[data-theme='dark'] .status-delivered { background: #12301c; color: #86efac; }
+
+.admin-table-wrap { overflow-x: auto; }
+
+.nowrap { white-space: nowrap; }
+
+.order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.1rem 0;
+  font-size: 0.82rem;
+}
+
+.order-item em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--adm-soft);
+}
+
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.6rem 0 0.9rem;
+  border-bottom: 1px solid var(--adm-line);
+  margin-bottom: 1rem;
+}
+
+.bulk-hint {
+  font-size: 0.8rem;
+  color: var(--adm-muted);
+  margin-right: 0.5rem;
+}
 
 @media (max-width: 720px) {
   .form-grid { grid-template-columns: 1fr; }

@@ -14,13 +14,16 @@ const formatMoney = (n, prefix = "KSh") => `${prefix} ${n.toLocaleString()}`
 
 export function CartPage() {
   const { items, updateQty, removeFromCart, clearCart, total, parsePrice } = useCart()
-  const { user, setPhone } = useAuth()
+  const { user, setPhone, setName } = useAuth()
   const navigate = useNavigate()
   const [phoneOpen, setPhoneOpen] = useState(false)
+  const [name, setNameValue] = useState('')
   const [phone, setPhoneValue] = useState('')
+  const [nameError, setNameError] = useState(null)
   const [phoneError, setPhoneError] = useState(null)
   const [phoneBusy, setPhoneBusy] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
+  const [checkedOut, setCheckedOut] = useState(false)
   const currency = items.find((i) => /[^\d]/.test(String(i.price ?? '')))
     ? prefixOf(items[0].price)
     : "KSh"
@@ -31,7 +34,9 @@ export function CartPage() {
       navigate('/login')
       return
     }
+    setNameValue(user.displayName ?? '')
     setPhoneValue(user.phone ?? '')
+    setNameError(null)
     setPhoneError(null)
     setPhoneOpen(true)
   }
@@ -39,15 +44,36 @@ export function CartPage() {
   const submitOrder = async (e) => {
     e.preventDefault()
     setPhoneBusy(true)
+    setNameError(null)
     setPhoneError(null)
-    const err = await setPhone(phone)
+    const nameErr = await setName(name)
+    const phoneErr = await setPhone(phone)
+    if (nameErr) setNameError(nameErr)
+    if (phoneErr) setPhoneError(phoneErr)
+    if (nameErr || phoneErr) {
+      setPhoneBusy(false)
+      return
+    }
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, phone, items }),
+    })
     setPhoneBusy(false)
-    if (err) {
-      setPhoneError(err)
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setPhoneError(data.error ?? 'Could not place the order — try again')
       return
     }
     setPhoneOpen(false)
     setOrderPlaced(true)
+  }
+
+  const checkout = () => {
+    if (!items.length) return
+    if (!confirm('Complete checkout? Your cart will be emptied.')) return
+    clearCart()
+    setCheckedOut(true)
   }
 
   return (
@@ -61,6 +87,15 @@ export function CartPage() {
             <h2>Shopping cart</h2>
           </div>
         </section>
+
+        {orderPlaced && (
+          <p className="order-success">
+            Order placed! We&apos;ll call <strong>{user.phone}</strong> to confirm your delivery{user.displayName ? `, ${user.displayName}` : ''}. Your cart is kept until you check out.
+          </p>
+        )}
+        {checkedOut && (
+          <p className="order-success">Checkout complete! Your cart has been cleared.</p>
+        )}
 
         {items.length === 0 ? (
           <div className="cart-empty">
@@ -115,15 +150,11 @@ export function CartPage() {
               <button
                 type="button"
                 className={`secondary-btn cart-checkout-btn ${orderPlaced ? 'glow' : ''}`}
+                onClick={checkout}
               >Proceed to checkout</button>
               <button type="button" className="secondary-btn cart-clear-btn" onClick={clearCart}>
                 Clear cart
               </button>
-              {orderPlaced && (
-                <p className="order-success">
-                  Order placed! We&apos;ll call <strong>{user.phone}</strong> to confirm your delivery.
-                </p>
-              )}
             </aside>
           </div>
         )}
@@ -137,13 +168,20 @@ export function CartPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2>Confirm your order</h2>
-            <p>Enter your phone number so we can confirm your delivery.</p>
+            <p>Enter your name and phone number so we can confirm your delivery.</p>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setNameValue(e.target.value)}
+              placeholder="Your name"
+              autoFocus
+            />
+            {nameError && <p className="error">{nameError}</p>}
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhoneValue(e.target.value)}
               placeholder="e.g. 0712 345 678"
-              autoFocus
             />
             {phoneError && <p className="error">{phoneError}</p>}
             <button type="submit" className="primary-btn" disabled={phoneBusy}>

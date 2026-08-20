@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import './admin.css'
 
 export const ADMIN_PATH = '/admin-7f3k9'
@@ -91,9 +91,14 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
   const [db, setDb] = useState(null)
   const [tab, setTab] = useState('products')
   const [msg, setMsg] = useState(null)
+  const [ngrokUrl, setNgrokUrl] = useState(null)
+  const [copied, setCopied] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     api('/api/data').then((res) => res.json()).then(setDb).catch(() => {})
+    api('/api/admin/ngrok').then((res) => res.json()).then((d) => setNgrokUrl(d.url)).catch(() => {})
   }, [])
 
   const flash = (text) => {
@@ -114,6 +119,31 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
     }
   }
 
+  // Full-page product editor routes:
+  // /admin-7f3k9/products/new          -> create a product
+  // /admin-7f3k9/products/:id/edit     -> edit an existing product
+  const isNewProduct = location.pathname === `${ADMIN_PATH}/products/new`
+  const editMatch = location.pathname.match(/\/products\/(\d+)\/edit$/)
+  const editProductId = editMatch ? Number(editMatch[1]) : null
+  const editingProduct = isNewProduct
+    ? { ...emptyProduct(), category: db?.categories?.find((c) => c.name !== 'All')?.name ?? '' }
+    : editProductId != null
+      ? (db?.catalogProducts ?? []).find((p) => p.id === editProductId) ?? null
+      : null
+  const onProductEditor = Boolean(editingProduct)
+
+  const saveProduct = (product) => {
+    const products = db.catalogProducts
+    let next
+    if (product.id) {
+      next = products.map((p) => (p.id === product.id ? product : p))
+    } else {
+      const newId = Math.max(0, ...products.map((p) => p.id)) + 1
+      next = [...products, { ...product, id: newId }]
+    }
+    save('catalogProducts', next)
+  }
+
   const logout = async () => {
     await api('/api/logout', { method: 'POST' })
     onLogout()
@@ -123,6 +153,8 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
 
   const tabs = [
     { id: 'products', label: 'Products' },
+    { id: 'customers', label: 'Customers' },
+    { id: 'orders', label: 'Orders' },
     { id: 'featured', label: 'Featured deals' },
     { id: 'categories', label: 'Categories' },
     { id: 'menus', label: 'Subcategories' },
@@ -137,6 +169,20 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
           <small>Manage your store</small>
         </div>
         <div className="admin-bar-actions">
+          {ngrokUrl && (
+            <button
+              type="button"
+              className="btn ghost small ngrok-badge"
+              title="Share this link with customers"
+              onClick={() => {
+                navigator.clipboard?.writeText(ngrokUrl)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 1500)
+              }}
+            >
+              {copied ? 'Copied ✓' : '🔗 ' + ngrokUrl.replace('https://', '')}
+            </button>
+          )}
           <button
             type="button"
             className="btn ghost small"
@@ -152,38 +198,63 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
 
       <nav className="admin-tabs">
         {tabs.map((t) => (
-          <button key={t.id} type="button" className={tab === t.id ? 'active' : ''} onClick={() => setTab(t.id)}>
+          <button
+            key={t.id}
+            type="button"
+            className={t.id === 'products' && onProductEditor ? '' : tab === t.id ? 'active' : ''}
+            onClick={() => { navigate(ADMIN_PATH); setTab(t.id) }}
+          >
             {t.label}
           </button>
         ))}
       </nav>
 
       <main className="admin-content">
-        {tab === 'products' && (
-          <ProductsTab products={db.catalogProducts} categories={db.categories} onSave={(v) => save('catalogProducts', v)} />
-        )}
-        {tab === 'featured' && (
-          <FeaturedTab products={db.featuredProducts} categories={db.categories} onSave={(v) => save('featuredProducts', v)} />
-        )}
-        {tab === 'categories' && (
-          <CategoriesTab categories={db.categories} onSave={(v) => save('categories', v)} />
-        )}
-        {tab === 'menus' && (
-          <MenusTab menus={db.categoryMenus ?? []} categories={db.categories} onSave={(v) => save('categoryMenus', v)} />
-        )}
-        {tab === 'content' && (
-          <ContentTab
-            deals={db.deals}
-            trending={db.trendingProducts}
-            benefits={db.benefits}
-            siteContent={db.siteContent}
-            onSave={({ deals, trending, benefits, siteContent }) => {
-              save('deals', deals)
-              save('trendingProducts', trending)
-              save('benefits', benefits)
-              save('siteContent', siteContent)
+        {onProductEditor ? (
+          <ProductForm
+            initial={editingProduct}
+            categories={db.categories}
+            onSave={(product) => {
+              saveProduct(product)
+              navigate(ADMIN_PATH)
             }}
+            onCancel={() => navigate(ADMIN_PATH)}
           />
+        ) : (
+          <>
+            {tab === 'products' && (
+              <ProductsTab products={db.catalogProducts} onSave={(v) => save('catalogProducts', v)} />
+            )}
+            {tab === 'customers' && (
+              <CustomersTab />
+            )}
+            {tab === 'orders' && (
+              <OrdersTab />
+            )}
+            {tab === 'featured' && (
+              <FeaturedTab products={db.featuredProducts} categories={db.categories} onSave={(v) => save('featuredProducts', v)} />
+            )}
+            {tab === 'categories' && (
+              <CategoriesTab categories={db.categories} onSave={(v) => save('categories', v)} />
+            )}
+            {tab === 'menus' && (
+              <MenusTab menus={db.categoryMenus ?? []} categories={db.categories} onSave={(v) => save('categoryMenus', v)} />
+            )}
+            {tab === 'content' && (
+              <ContentTab
+                deals={db.deals}
+                trending={db.trendingProducts}
+                benefits={db.benefits}
+                siteContent={db.siteContent}
+                onSave={({ deals, trending, benefits, siteContent }) => {
+                  save('deals', deals)
+                  save('trendingProducts', trending)
+                  save('benefits', benefits)
+                  save('siteContent', siteContent)
+                }}
+              />
+            )}
+          </>
         )}
       </main>
 
@@ -321,25 +392,13 @@ function ProductForm({ initial, categories, onSave, onCancel }) {
   )
 }
 
-function ProductsTab({ products, categories, onSave }) {
+function ProductsTab({ products, onSave }) {
   const [query, setQuery] = useState('')
-  const [editing, setEditing] = useState(null)
+  const navigate = useNavigate()
 
   const filtered = products.filter((p) =>
     (p.name + ' ' + (p.brand ?? '') + ' ' + p.category).toLowerCase().includes(query.toLowerCase())
   )
-
-  const saveProduct = (product) => {
-    let next
-    if (product.id) {
-      next = products.map((p) => (p.id === product.id ? product : p))
-    } else {
-      const newId = Math.max(0, ...products.map((p) => p.id)) + 1
-      next = [...products, { ...product, id: newId }]
-    }
-    onSave(next)
-    setEditing(null)
-  }
 
   const removeProduct = (id) => {
     if (!confirm('Delete this product?')) return
@@ -354,7 +413,7 @@ function ProductsTab({ products, categories, onSave }) {
             <h2>Products</h2>
             <p className="panel-hint">{products.length} products in your store</p>
           </div>
-          <button type="button" className="btn" onClick={() => setEditing({ ...emptyProduct(), category: categories.find((c) => c.name !== 'All')?.name ?? '' })}>
+          <button type="button" className="btn" onClick={() => navigate(`${ADMIN_PATH}/products/new`)}>
             + Add product
           </button>
         </div>
@@ -375,7 +434,7 @@ function ProductsTab({ products, categories, onSave }) {
                   <td>{p.price}</td>
                   <td>★ {p.rating}</td>
                   <td style={{ textAlign: 'right' }}>
-                    <button type="button" className="btn ghost small" onClick={() => setEditing({ ...p, specs: [...(p.specs ?? [])] })}>Edit</button>{' '}
+                    <button type="button" className="btn ghost small" onClick={() => navigate(`${ADMIN_PATH}/products/${p.id}/edit`)}>Edit</button>{' '}
                     <button type="button" className="btn danger small" onClick={() => removeProduct(p.id)}>Delete</button>
                   </td>
                 </tr>
@@ -384,9 +443,316 @@ function ProductsTab({ products, categories, onSave }) {
           </table>
         )}
       </div>
+    </div>
+  )
+}
 
-      {editing && (
-        <ProductForm initial={editing} categories={categories} onSave={saveProduct} onCancel={() => setEditing(null)} />
+const STATUS_LABELS = { pending: 'Pending', confirmed: 'Confirmed', canceled: 'Canceled', delivered: 'Delivered' }
+
+function CustomersTab() {
+  const [customers, setCustomers] = useState([])
+  const [refreshing, setRefreshing] = useState(false)
+
+  const load = async () => {
+    setRefreshing(true)
+    try {
+      const res = await api('/api/admin/customers')
+      const data = await res.json()
+      setCustomers(data.customers ?? [])
+    } catch {
+      // keep last known data
+    }
+    setRefreshing(false)
+  }
+
+  useEffect(() => {
+    load()
+    const id = setInterval(load, 15000)
+    return () => clearInterval(id)
+  }, [])
+
+  const parsePrice = (price) => Number(String(price ?? '').replace(/[^\d]/g, '')) || 0
+  const cartTotal = (items) => (items ?? []).reduce((s, i) => s + parsePrice(i.price) * (i.qty ?? 1), 0)
+  const fmtTime = (iso) =>
+    new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+
+  return (
+    <div className="admin-panel">
+      <div className="admin-panel-head">
+        <div>
+          <h2>Customers & live carts</h2>
+          <p className="panel-hint">
+            {customers.length} registered users · carts update live, so products added or removed by a customer show here on refresh
+          </p>
+        </div>
+        <button type="button" className="btn ghost small" onClick={load} disabled={refreshing}>
+          {refreshing ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
+
+      {customers.length === 0 ? (
+        <p className="muted">No registered users yet. When a customer signs in, they appear here with their live cart.</p>
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table orders-table">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Cart (live)</th>
+                <th>Total</th>
+                <th>Last active</th>
+              </tr>
+            </thead>
+            <tbody>
+              {customers.map((c) => {
+                const items = c.items ?? []
+                return (
+                  <tr key={c.id}>
+                    <td>
+                      <strong>{c.displayName || c.username || c.email}</strong>
+                      {c.username && <div className="muted">@{c.username}</div>}
+                      <div className="muted">{c.email}</div>
+                      {c.phone && <div className="muted">{c.phone}</div>}
+                    </td>
+                    <td>
+                      {items.length === 0 ? (
+                        <span className="muted">Empty</span>
+                      ) : (
+                        items.map((item, idx) => (
+                          <div key={idx} className="order-item">
+                            <span>{item.name}</span>
+                            <em>× {item.qty ?? 1}</em>
+                          </div>
+                        ))
+                      )}
+                    </td>
+                    <td className="nowrap">{items.length ? `KSh ${cartTotal(items).toLocaleString()}` : '—'}</td>
+                    <td className="nowrap muted">{fmtTime(c.lastActive)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OrdersTab() {
+  const [orders, setOrders] = useState([])
+  const [busyId, setBusyId] = useState(null)
+  const [selected, setSelected] = useState([])
+
+  const load = () => {
+    api('/api/admin/orders')
+      .then((res) => res.json())
+      .then((d) => setOrders(d.orders ?? []))
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    load()
+    const id = setInterval(load, 15000)
+    return () => clearInterval(id)
+  }, [])
+
+  const setStatus = async (id, status) => {
+    setBusyId(id)
+    const res = await api(`/api/admin/orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    })
+    setBusyId(null)
+    if (res.ok) load()
+  }
+
+  const removeOrder = async (id) => {
+    if (!confirm('Delete this order permanently?')) return
+    setBusyId(id)
+    const res = await api(`/api/admin/orders/${id}`, { method: 'DELETE' })
+    setBusyId(null)
+    if (res.ok) load()
+  }
+
+  const toggle = (id) =>
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
+  const toggleAll = () =>
+    setSelected((prev) => (prev.length === orders.length ? [] : orders.map((o) => o.id)))
+
+  const bulkStatus = async (status) => {
+    if (selected.length === 0) return
+    if (!confirm(`Mark ${selected.length} selected order(s) as ${STATUS_LABELS[status].toLowerCase()}?`)) return
+    setBusyId('bulk')
+    await Promise.all(
+      selected.map((id) =>
+        api(`/api/admin/orders/${id}/status`, {
+          method: 'PUT',
+          body: JSON.stringify({ status }),
+        })
+      )
+    )
+    setBusyId(null)
+    setSelected([])
+    load()
+  }
+
+  const fmtTime = (iso) =>
+    new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+
+  return (
+    <div className="admin-panel">
+      <div className="admin-panel-head">
+        <div>
+          <h2>Orders</h2>
+          <p className="panel-hint">
+            {orders.length} orders total · {orders.filter((o) => o.status === 'pending').length} pending
+          </p>
+        </div>
+        <button type="button" className="btn ghost small" onClick={load}>Refresh</button>
+      </div>
+
+      <div className="bulk-actions">
+        <span className="bulk-hint">
+          {selected.length ? `${selected.length} order${selected.length > 1 ? 's' : ''} selected` : 'Tick orders, then use the buttons'}
+        </span>
+        <button
+          type="button"
+          className="btn small"
+          disabled={selected.length === 0 || busyId === 'bulk'}
+          onClick={() => bulkStatus('confirmed')}
+        >
+          Confirm order
+        </button>
+        <button
+          type="button"
+          className="btn danger small"
+          disabled={selected.length === 0 || busyId === 'bulk'}
+          onClick={() => bulkStatus('canceled')}
+        >
+          Cancel order
+        </button>
+        <button
+          type="button"
+          className="btn small"
+          disabled={selected.length === 0 || busyId === 'bulk'}
+          onClick={() => bulkStatus('delivered')}
+        >
+          Deliver
+        </button>
+      </div>
+
+      {orders.length === 0 ? (
+        <p className="muted">No orders yet. When a customer places an order it will show up here.</p>
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table orders-table">
+            <thead>
+              <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    checked={orders.length > 0 && selected.length === orders.length}
+                    onChange={toggleAll}
+                    aria-label="Select all orders"
+                  />
+                </th>
+                <th>Date</th>
+                <th>Customer</th>
+                <th>Items</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((order) => (
+                <tr key={order.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(order.id)}
+                      onChange={() => toggle(order.id)}
+                      aria-label={`Select order ${order.id}`}
+                    />
+                  </td>
+                  <td className="nowrap muted">{fmtTime(order.created_at)}</td>
+                  <td>
+                    <strong>{order.name}</strong>
+                    <div className="muted">{order.phone}</div>
+                    <div className="muted">{order.email}</div>
+                  </td>
+                  <td>
+                    {(order.items ?? []).map((item, idx) => (
+                      <div key={idx} className="order-item">
+                        <span>{item.name}</span>
+                        <em>× {item.qty ?? 1}</em>
+                      </div>
+                    ))}
+                  </td>
+                  <td className="nowrap">{order.total}</td>
+                  <td>
+                    <span className={`status-badge status-${order.status}`}>
+                      {STATUS_LABELS[order.status] ?? order.status}
+                    </span>
+                  </td>
+                  <td className="nowrap">
+                    {order.status === 'pending' && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn small"
+                          disabled={busyId === order.id}
+                          onClick={() => setStatus(order.id, 'confirmed')}
+                        >
+                          Confirm
+                        </button>{' '}
+                        <button
+                          type="button"
+                          className="btn danger small"
+                          disabled={busyId === order.id}
+                          onClick={() => setStatus(order.id, 'canceled')}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                    {order.status === 'confirmed' && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn small"
+                          disabled={busyId === order.id}
+                          onClick={() => setStatus(order.id, 'delivered')}
+                        >
+                          Deliver
+                        </button>{' '}
+                        <button
+                          type="button"
+                          className="btn danger small"
+                          disabled={busyId === order.id}
+                          onClick={() => setStatus(order.id, 'canceled')}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      className="btn danger small"
+                      disabled={busyId === order.id}
+                      title="Remove from this list"
+                      onClick={() => removeOrder(order.id)}
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

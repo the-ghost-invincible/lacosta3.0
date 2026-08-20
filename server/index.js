@@ -9,6 +9,7 @@ import { config } from './config.js'
 import { initDb } from './db.js'
 import { authRouter } from './auth.js'
 import { cartRouter } from './cart.js'
+import { orderRouter, orderAdminRouter, getCustomers } from './orders.js'
 
 const root = path.resolve(import.meta.dirname, '..')
 const dataFile = path.join(import.meta.dirname, 'data.json')
@@ -58,6 +59,11 @@ app.use('/api/auth', authRouter)
 // ---------- Cart (per user) ----------
 app.use('/api/cart', cartRouter)
 
+// ---------- Orders ----------
+app.use('/api/orders', orderRouter)
+app.get('/api/admin/customers', requireAuth, getCustomers)
+app.use('/api/admin/orders', requireAuth, orderAdminRouter)
+
 // ---------- Auth ----------
 app.post('/api/login', (req, res) => {
   const { password } = req.body ?? {}
@@ -93,6 +99,18 @@ app.put('/api/admin/data', requireAuth, (req, res) => {
   data[section] = value
   writeData(data)
   res.json({ ok: true })
+})
+
+// ---------- Admin: ngrok tunnel ----------
+app.get('/api/admin/ngrok', requireAuth, async (_req, res) => {
+  try {
+    const response = await fetch('http://127.0.0.1:4040/api/tunnels')
+    const tunnels = (await response.json())?.tunnels ?? []
+    const url = tunnels.find((t) => t.public_url.startsWith('https://'))?.public_url ?? null
+    res.json({ url })
+  } catch {
+    res.json({ url: null })
+  }
 })
 
 // ---------- Admin: image upload ----------

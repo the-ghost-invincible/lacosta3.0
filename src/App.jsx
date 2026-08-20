@@ -23,6 +23,8 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path={ADMIN_PATH} element={<AdminPage />} />
+            <Route path={`${ADMIN_PATH}/products/new`} element={<AdminPage />} />
+            <Route path={`${ADMIN_PATH}/products/:id/edit`} element={<AdminPage />} />
           </Routes>
         </BrowserRouter>
       </CartProvider>

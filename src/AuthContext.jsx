@@ -76,8 +76,23 @@ export function AuthProvider({ children }) {
     return data.error ?? 'Something went wrong'
   }
 
+  // Returns null on success, or an error message
+  const setName = async (name) => {
+    const res = await fetch('/api/auth/name', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) {
+      setUser(data.user)
+      return null
+    }
+    return data.error ?? 'Something went wrong'
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, setUsername, setPhone }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, setUsername, setPhone, setName }}>
       {children}
     </AuthContext.Provider>
   )

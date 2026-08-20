@@ -38,10 +38,25 @@ const CARTS_TABLE = `
   )
 `
 
+const ORDERS_TABLE = `
+  CREATE TABLE IF NOT EXISTS orders (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    name TEXT,
+    phone TEXT,
+    email TEXT,
+    items JSONB NOT NULL DEFAULT '[]'::jsonb,
+    total TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )
+`
+
 export async function initDb() {
   await pool.query(USERS_TABLE)
   await pool.query(SESSIONS_TABLE)
   await pool.query(CARTS_TABLE)
+  await pool.query(ORDERS_TABLE)
   // Migration for databases created before email/password auth:
   // add password_hash if missing and drop the obsolete google_id column.
   await pool.query(

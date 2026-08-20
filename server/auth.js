@@ -176,4 +176,21 @@ router.put('/phone', async (req, res) => {
   res.json({ user: publicUser(result.rows[0]) })
 })
 
+// Save / update the signed-in user's name (used at checkout)
+router.put('/name', async (req, res) => {
+  const user = await userFromSession(req)
+  if (!user) return res.status(401).json({ error: 'Not signed in' })
+
+  const name = String(req.body?.name ?? '').trim()
+  if (!name || name.length > 50) {
+    return res.status(400).json({ error: 'Enter a valid name' })
+  }
+
+  const result = await pool.query(
+    'UPDATE users SET display_name = $1 WHERE id = $2 RETURNING *',
+    [name, user.id]
+  )
+  res.json({ user: publicUser(result.rows[0]) })
+})
+
 export const authRouter = router
