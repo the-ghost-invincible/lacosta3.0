@@ -1,6 +1,7 @@
 import { Header, CategoryNavigation } from './Header'
 import { useSiteData } from './useSiteData'
 import { useCart } from './CartContext'
+import { ProductModal } from './ProductModal'
 import { useState, useMemo, useRef } from 'react'
 import './App.css'
 
@@ -11,6 +12,7 @@ export function Home() {
   const { addToCart } = useCart()
   const [selectedProductId, setSelectedProductId] = useState(catalogProducts[0]?.id ?? null)
   const [justAddedId, setJustAddedId] = useState(null)
+  const [modalProduct, setModalProduct] = useState(null)
   const [sort, setSort] = useState('Popular')
   const catalogRef = useRef(null)
 
@@ -103,7 +105,7 @@ export function Home() {
 
         <section className="product-grid">
           {featuredProducts.map((product) => (
-            <article key={product.id} className="product-card">
+            <article key={product.id} className="product-card" onClick={() => setModalProduct(product)}>
               <div className="card-image-wrap">
                 <img src={product.image} alt={product.name} />
                 <span className="product-badge">{product.badge}</span>
@@ -148,7 +150,7 @@ export function Home() {
                 <article
                   key={product.id}
                   className={`product-card catalog-card ${currentProduct.id === product.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedProductId(product.id)}
+                  onClick={() => { setSelectedProductId(product.id); setModalProduct(product) }}
                 >
                   <div className="card-image-wrap">
                     <img src={product.image} alt={product.name} />
@@ -221,7 +223,7 @@ export function Home() {
 
           <div className="mini-product-grid">
             {trendingProducts.map((product) => (
-              <article key={product.name} className="mini-product-card">
+              <article key={product.name} className="mini-product-card" onClick={() => setModalProduct(product)}>
                 <img src={product.image} alt={product.name} />
                 <div>
                   <h3>{product.name}</h3>
@@ -252,6 +254,8 @@ export function Home() {
       </main>
 
       <footer className="site-footer"></footer>
+
+      <ProductModal product={modalProduct} onClose={() => setModalProduct(null)} />
     </div>
   )
 }

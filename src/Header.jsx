@@ -13,7 +13,7 @@ export function Header() {
   const [theme, setTheme] = useState(() => localStorage.getItem('lacosta-theme') || 'light')
   const { siteContent, catalogProducts, categories, categoryMenus } = useSiteData()
   const { count } = useCart()
-  const { user, loading, login } = useAuth()
+  const { user, loading } = useAuth()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -249,7 +249,7 @@ export function Header() {
                 <span>@{user.username ?? 'Set username'}</span>
               </button>
             ) : (
-              <button type="button" className="nav-pill" onClick={login}>Login</button>
+              <button type="button" className="nav-pill" onClick={() => navigate('/login')}>Login</button>
             )}
             <button type="button" className="nav-pill accent">Sell</button>
             <button
@@ -278,7 +278,7 @@ export function Header() {
 
       <MobileNav theme={theme} onToggleTheme={toggleTheme} onAccountClick={() => {
     if (user) navigate('/account')
-    else login()
+    else navigate('/login')
   }} />
     </>
   )

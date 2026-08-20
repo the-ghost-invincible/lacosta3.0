@@ -14,17 +14,36 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false))
   }, [])
 
-  const login = () => {
-    window.location.href = '/api/auth/google'
+  // Returns null on success, or an error message
+  const login = async (email, password) => {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) {
+      setUser(data.user)
+      return null
+    }
+    return data.error ?? 'Something went wrong'
+  }
+
+  // Returns null on success, or an error message
+  const register = async (email, password) => {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) return null
+    return data.error ?? 'Something went wrong'
   }
 
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     setUser(null)
-  }
-
-  const switchAccount = () => {
-    fetch('/api/auth/logout', { method: 'POST' }).then(login)
   }
 
   // Returns null on success, or an error message
@@ -42,8 +61,23 @@ export function AuthProvider({ children }) {
     return data.error ?? 'Something went wrong'
   }
 
+  // Returns null on success, or an error message
+  const setPhone = async (phone) => {
+    const res = await fetch('/api/auth/phone', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) {
+      setUser(data.user)
+      return null
+    }
+    return data.error ?? 'Something went wrong'
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, switchAccount, setUsername }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, setUsername, setPhone }}>
       {children}
     </AuthContext.Provider>
   )

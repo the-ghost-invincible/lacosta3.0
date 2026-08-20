@@ -2,6 +2,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { Header, CategoryNavigation } from './Header'
 import { useSiteData } from './useSiteData'
 import { useCart } from './CartContext'
+import { ProductModal } from './ProductModal'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import './App.css'
 
@@ -25,6 +26,7 @@ export function CategoryPage() {
   const [selectedBrand, setSelectedBrand] = useState('All')
   const [openMenu, setOpenMenu] = useState(null) // For dropdown menu
   const [sort, setSort] = useState('Popular')
+  const [modalProduct, setModalProduct] = useState(null)
 
   // Deep link from the search bar: ?p=<productId> selects that product
   const productParam = searchParams.get('p')
@@ -230,7 +232,7 @@ export function CategoryPage() {
                         style={{
                           padding: '0.5rem 1rem',
                           backgroundColor: selectedGroup === group.name ? 'var(--bg-accent-soft)' : 'var(--btn-bg)',
-                          color: selectedGroup === group.name ? '#ff6b1a' : 'var(--btn-text)',
+                          color: selectedGroup === group.name ? '#65a30d' : 'var(--btn-text)',
                           border: 'none',
                           borderRadius: '4px',
                           cursor: 'pointer',
@@ -341,7 +343,7 @@ export function CategoryPage() {
                   <article
                     key={product.id}
                     className={`product-card catalog-card ${currentProduct?.id === product.id ? 'selected' : ''}`}
-                    onClick={() => setSelectedProductId(product.id)}
+                    onClick={() => { setSelectedProductId(product.id); setModalProduct(product) }}
                   >
                     <div className="card-image-wrap">
                       <img src={product.image} alt={product.name} />
@@ -421,7 +423,7 @@ export function CategoryPage() {
 
           <div className="mini-product-grid">
             {trendingProducts.map((product) => (
-              <article key={product.name} className="mini-product-card">
+              <article key={product.name} className="mini-product-card" onClick={() => setModalProduct(product)}>
                 <img src={product.image} alt={product.name} />
                 <div>
                   <h3>{product.name}</h3>
@@ -434,6 +436,8 @@ export function CategoryPage() {
       </main>
 
       <footer className="site-footer"></footer>
+
+      <ProductModal product={modalProduct} onClose={() => setModalProduct(null)} />
     </div>
   )
 }

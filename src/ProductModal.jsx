@@ -1,0 +1,61 @@
+import { useState } from 'react'
+import { useCart } from './CartContext'
+import './App.css'
+
+export function ProductModal({ product, onClose }) {
+  const { addToCart } = useCart()
+  const [justAdded, setJustAdded] = useState(false)
+
+  if (!product) return null
+
+  const handleAdd = () => {
+    addToCart(product)
+    setJustAdded(true)
+    setTimeout(() => setJustAdded(false), 1200)
+  }
+
+  return (
+    <div className="product-modal-overlay" onClick={onClose}>
+      <div className="product-modal" role="dialog" aria-label={product.name} onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="product-modal-close" onClick={onClose} aria-label="Close">
+          ✕
+        </button>
+
+        <div className="product-modal-image">
+          <img src={product.image} alt={product.name} />
+        </div>
+
+        <div className="product-modal-body">
+          {product.category && <span className="product-category">{product.category}</span>}
+          <h3>{product.name}</h3>
+
+          <div className="rating-row">
+            {product.rating != null && <span>★ {product.rating}</span>}
+            {product.seller && <span>{product.seller}</span>}
+          </div>
+
+          <div className="detail-price">
+            <strong>{product.price}</strong>
+            {product.oldPrice && <span>{product.oldPrice}</span>}
+          </div>
+
+          {product.description && <p className="detail-description">{product.description}</p>}
+
+          {Array.isArray(product.specs) && product.specs.length > 0 && (
+            <div className="spec-list">
+              {product.specs.map((spec) => (
+                <span key={spec}>{spec}</span>
+              ))}
+            </div>
+          )}
+
+          <button type="button" className="primary-btn product-modal-add" onClick={handleAdd}>
+            {justAdded ? 'Added ✓' : 'Add to cart'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default ProductModal

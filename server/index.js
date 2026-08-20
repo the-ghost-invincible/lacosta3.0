@@ -8,6 +8,7 @@ import path from 'node:path'
 import { config } from './config.js'
 import { initDb } from './db.js'
 import { authRouter } from './auth.js'
+import { cartRouter } from './cart.js'
 
 const root = path.resolve(import.meta.dirname, '..')
 const dataFile = path.join(import.meta.dirname, 'data.json')
@@ -53,6 +54,9 @@ app.get('/api/data', (_req, res) => {
 
 // ---------- Users ----------
 app.use('/api/auth', authRouter)
+
+// ---------- Cart (per user) ----------
+app.use('/api/cart', cartRouter)
 
 // ---------- Auth ----------
 app.post('/api/login', (req, res) => {

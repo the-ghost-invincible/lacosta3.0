@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext'
 import './App.css'
 
 export function AccountPage() {
-  const { user, loading, login, logout, switchAccount } = useAuth()
+  const { user, loading, logout } = useAuth()
   const navigate = useNavigate()
 
   if (loading) {
@@ -30,8 +30,8 @@ export function AccountPage() {
             </div>
           </section>
           <div className="account-card">
-            <p>Sign in with Google to see your account, orders and saved items.</p>
-            <button type="button" className="primary-btn" onClick={login}>Login with Google</button>
+            <p>Log in with your email and password to see your account, orders and saved items.</p>
+            <button type="button" className="primary-btn" onClick={() => navigate('/login')}>Log in</button>
           </div>
         </main>
       </div>
@@ -61,7 +61,6 @@ export function AccountPage() {
 
           <div className="account-actions">
             <button type="button" className="primary-btn" onClick={() => navigate('/')}>Continue shopping</button>
-            <button type="button" className="secondary-btn" onClick={switchAccount}>Switch account</button>
             <button type="button" className="secondary-btn" onClick={logout}>Log out</button>
           </div>
         </div>

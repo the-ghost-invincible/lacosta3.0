@@ -1,6 +1,8 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { Header } from './Header'
 import { useCart } from './CartContext'
+import { useAuth } from './AuthContext'
 import './App.css'
 
 const prefixOf = (price) => {
@@ -12,10 +14,41 @@ const formatMoney = (n, prefix = "KSh") => `${prefix} ${n.toLocaleString()}`
 
 export function CartPage() {
   const { items, updateQty, removeFromCart, clearCart, total, parsePrice } = useCart()
+  const { user, setPhone } = useAuth()
   const navigate = useNavigate()
+  const [phoneOpen, setPhoneOpen] = useState(false)
+  const [phone, setPhoneValue] = useState('')
+  const [phoneError, setPhoneError] = useState(null)
+  const [phoneBusy, setPhoneBusy] = useState(false)
+  const [orderPlaced, setOrderPlaced] = useState(false)
   const currency = items.find((i) => /[^\d]/.test(String(i.price ?? '')))
     ? prefixOf(items[0].price)
     : "KSh"
+
+  const placeOrder = () => {
+    setOrderPlaced(false)
+    if (!user) {
+      navigate('/login')
+      return
+    }
+    setPhoneValue(user.phone ?? '')
+    setPhoneError(null)
+    setPhoneOpen(true)
+  }
+
+  const submitOrder = async (e) => {
+    e.preventDefault()
+    setPhoneBusy(true)
+    setPhoneError(null)
+    const err = await setPhone(phone)
+    setPhoneBusy(false)
+    if (err) {
+      setPhoneError(err)
+      return
+    }
+    setPhoneOpen(false)
+    setOrderPlaced(true)
+  }
 
   return (
     <div className="page-shell">
@@ -78,15 +111,50 @@ export function CartPage() {
                 <span>Total</span>
                 <span>{formatMoney(total, currency)}</span>
               </div>
-              <button type="button" className="primary-btn cart-place-order-btn">Place order</button>
-              <button type="button" className="secondary-btn cart-checkout-btn">Proceed to checkout</button>
+              <button type="button" className="primary-btn cart-place-order-btn" onClick={placeOrder}>Place order</button>
+              <button
+                type="button"
+                className={`secondary-btn cart-checkout-btn ${orderPlaced ? 'glow' : ''}`}
+              >Proceed to checkout</button>
               <button type="button" className="secondary-btn cart-clear-btn" onClick={clearCart}>
                 Clear cart
               </button>
+              {orderPlaced && (
+                <p className="order-success">
+                  Order placed! We&apos;ll call <strong>{user.phone}</strong> to confirm your delivery.
+                </p>
+              )}
             </aside>
           </div>
         )}
       </main>
+
+      {phoneOpen && (
+        <div className="order-overlay" onClick={() => setPhoneOpen(false)}>
+          <form
+            className="order-card"
+            onSubmit={submitOrder}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2>Confirm your order</h2>
+            <p>Enter your phone number so we can confirm your delivery.</p>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhoneValue(e.target.value)}
+              placeholder="e.g. 0712 345 678"
+              autoFocus
+            />
+            {phoneError && <p className="error">{phoneError}</p>}
+            <button type="submit" className="primary-btn" disabled={phoneBusy}>
+              {phoneBusy ? 'Placing…' : 'Place order'}
+            </button>
+            <button type="button" className="text-btn" onClick={() => setPhoneOpen(false)}>
+              Cancel
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   )
 }

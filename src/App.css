@@ -38,11 +38,11 @@
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #ff8a1e, #ff5b2e);
+  background: linear-gradient(135deg, #a3e635, #65a30d);
   color: white;
   font-weight: 800;
   font-size: 1.2rem;
-  box-shadow: 0 12px 24px rgba(255, 123, 0, 0.24);
+  box-shadow: 0 12px 24px rgba(132, 204, 22, 0.35);
 }
 
 .brand-name {
@@ -100,7 +100,7 @@
 
 .search-bar > button {
   min-width: 120px;
-  background: linear-gradient(135deg, #ff8a1e, #ff6b1a);
+  background: linear-gradient(135deg, #a3e635, #65a30d);
   color: white;
   font-weight: 700;
   padding: 16px 18px;
@@ -180,7 +180,7 @@
 
 .search-result mark {
   background: none;
-  color: #ff6b1a;
+  color: #65a30d;
   font-weight: 800;
 }
 
@@ -265,7 +265,7 @@
 
 .nav-pill.accent {
   background: var(--bg-accent-soft);
-  color: #ff6c1a;
+  color: #65a30d;
 }
 
 .cart-pill {
@@ -335,7 +335,7 @@
 }
 
 .account-username {
-  color: #ff6c1a;
+  color: #65a30d;
   font-weight: 700;
   font-size: 0.9rem;
 }
@@ -349,6 +349,80 @@
 .account-actions .primary-btn,
 .account-actions .secondary-btn {
   width: 100%;
+}
+
+.auth-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-2);
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-card .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-card .form-field span {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.auth-card input {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-2);
+  background: var(--bg-soft);
+  color: var(--text);
+  font-size: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.auth-card .error {
+  color: #e5484d;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.auth-notice {
+  color: #2e9e5b;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.auth-submit {
+  width: 100%;
+}
+
+.auth-switch {
+  margin: 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.auth-switch .text-btn {
+  background: none;
+  border: none;
+  color: #65a30d;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: underline;
 }
 
 .username-overlay {
@@ -414,6 +488,162 @@
   width: 100%;
 }
 
+.order-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.order-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-2);
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+}
+
+.order-card h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--text-strong);
+}
+
+.order-card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.order-card input {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-2);
+  background: var(--bg-soft);
+  color: var(--text);
+  font-size: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.order-card .error {
+  color: #e5484d;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.order-card .primary-btn {
+  width: 100%;
+}
+
+.order-card .text-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-decoration: underline;
+}
+
+.order-success {
+  margin: 0;
+  color: var(--check);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* ---------- Product lightbox ---------- */
+.product-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 12, 20, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.product-modal {
+  position: relative;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-2);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+}
+
+.product-modal-close {
+  position: sticky;
+  top: 12px;
+  margin-left: auto;
+  margin-right: 12px;
+  display: block;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.product-modal-image {
+  background: var(--bg-img);
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -52px;
+}
+
+.product-modal-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 12px;
+}
+
+.product-modal-body {
+  padding: 18px 22px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.product-modal-body h3 {
+  margin: 0;
+  font-size: 1.35rem;
+  color: var(--text-strong);
+}
+
+.product-modal-add {
+  width: 100%;
+  padding: 16px 22px;
+  font-size: 1.05rem;
+  margin-top: 6px;
+}
+
+.product-card,
+.mini-product-card {
+  cursor: pointer;
+}
+
 .promo-strip {
   background: var(--bg-promo);
   border-bottom: 1px solid var(--border-promo);
@@ -448,7 +678,7 @@
 
 .eyebrow {
   margin: 0 0 10px;
-  color: #ff7a1a;
+  color: #65a30d;
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -492,8 +722,8 @@
 
 .primary-btn {
   color: white;
-  background: linear-gradient(135deg, #ff8a1e, #ff6b1a);
-  box-shadow: 0 16px 28px rgba(255, 122, 26, 0.22);
+  background: linear-gradient(135deg, #a3e635, #65a30d);
+  box-shadow: 0 16px 28px rgba(132, 204, 22, 0.35);
 }
 
 .secondary-btn {
@@ -561,7 +791,7 @@
   background: rgba(255, 255, 255, 0.9);
   border-radius: 999px;
   padding: 8px 12px;
-  color: #ff6220;
+  color: #65a30d;
   font-weight: 800;
   font-size: 0.75rem;
 }
@@ -631,15 +861,15 @@
 }
 
 .category-pill.active {
-  border-color: #ff9e62;
-  box-shadow: 0 12px 24px rgba(255, 121, 32, 0.12);
+  border-color: #a3e635;
+  box-shadow: 0 12px 24px rgba(132, 204, 22, 0.2);
 }
 
 .category-pill span {
   font-size: 1.7rem;
 }
 
-.category-pill.orange { background: #fff4e9; }
+.category-pill.orange { background: #f1fbd8; }
 .category-pill.blue { background: #eef5ff; }
 .category-pill.pink { background: #fff0f6; }
 .category-pill.green { background: #ebfff5; }
@@ -667,7 +897,7 @@
 
 .section-header a,
 .panel-heading a {
-  color: #ff6b1a;
+  color: #65a30d;
   text-decoration: none;
   font-weight: 700;
 }
@@ -691,7 +921,7 @@
 }
 
 .deal-banner span {
-  color: #ff7a1a;
+  color: #65a30d;
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -719,8 +949,8 @@
 }
 
 .product-card.selected {
-  border-color: #ff9b45;
-  box-shadow: 0 18px 30px rgba(255, 123, 0, 0.12);
+  border-color: #a3e635;
+  box-shadow: 0 18px 30px rgba(132, 204, 22, 0.2);
 }
 
 .card-image-wrap {
@@ -744,7 +974,7 @@
   position: absolute;
   top: 12px;
   left: 12px;
-  background: rgba(255, 107, 26, 0.95);
+  background: rgba(101, 163, 13, 0.95);
   color: white;
   padding: 6px 10px;
   border-radius: 999px;
@@ -766,7 +996,7 @@
 .product-category {
   display: inline-block;
   margin-bottom: 8px;
-  color: #ff6b1a;
+  color: #65a30d;
   font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -844,7 +1074,7 @@
 
 .filter-chip.active {
   background: var(--bg-accent-soft);
-  color: #ff6b1a;
+  color: #65a30d;
 }
 
 .catalog-grid {
@@ -966,7 +1196,7 @@
 .seller-box span {
   border-radius: 999px;
   background: var(--bg-accent-soft);
-  color: #ff6b1a;
+  color: #65a30d;
   padding: 6px 10px;
   font-size: 0.72rem;
   font-weight: 800;
@@ -1009,7 +1239,7 @@
 }
 
 .mini-product-card strong {
-  color: #ff6b1a;
+  color: #65a30d;
 }
 
 .value-list {
@@ -1133,7 +1363,7 @@
 
 .mobile-nav a.active,
 .mobile-nav button.active {
-  color: #ff6b1a;
+  color: #65a30d;
 }
 
 /* ---------- Category sheet (mobile) ---------- */
@@ -1820,6 +2050,21 @@
   margin-top: 12px;
 }
 
+.cart-checkout-btn.glow {
+  border-color: var(--accent-bright);
+  color: var(--accent);
+  animation: checkout-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes checkout-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(132, 204, 22, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(132, 204, 22, 0.85), 0 0 40px rgba(163, 230, 53, 0.4);
+  }
+}
+
 .cart-clear-btn {
   width: 100%;
   margin-top: 8px;
@@ -1829,7 +2074,7 @@
   position: absolute;
   top: -6px;
   right: -6px;
-  background: #ff6b1a;
+  background: #65a30d;
   color: #fff;
   font-style: normal;
   font-size: 0.68rem;
