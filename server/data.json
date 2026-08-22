@@ -117,9 +117,7 @@
         "8GB RAM",
         "128GB",
         "Triple camera"
-      ],
-      "brand": "samsung",
-      "subcategory": "phones"
+      ]
     },
     {
       "id": 103,
@@ -619,84 +617,6 @@
         "Rich taste",
         "Real fruit"
       ]
-    },
-    {
-      "id": 131,
-      "name": "HP",
-      "category": "Phones & Tablets",
-      "price": "25,000",
-      "oldPrice": "30,000",
-      "image": "https://cdn.phototourl.com/free/2026-08-18-0ef05bb6-9fd4-4074-a822-46d1742ee4c6.jpg",
-      "seller": "HP",
-      "rating": 4.5,
-      "brand": "HP",
-      "description": "hp laptop",
-      "specs": [
-        "corei7"
-      ],
-      "subcategory": "Laptops"
-    },
-    {
-      "id": 132,
-      "name": "HP",
-      "category": "Phones & Tablets",
-      "price": "20,000",
-      "oldPrice": "25,000",
-      "image": "https://cdn.phototourl.com/free/2026-08-18-63ee8d53-efbd-42eb-9485-766c94fa6590.jpg",
-      "seller": "HP",
-      "rating": 4.5,
-      "brand": "HP",
-      "description": "hp laptop",
-      "specs": [
-        "core13"
-      ],
-      "subcategory": "Laptops"
-    },
-    {
-      "id": 133,
-      "name": "J4",
-      "category": "Fashion",
-      "price": "3000",
-      "oldPrice": "3500",
-      "image": "https://cdn.phototourl.com/free/2026-08-18-ebd2065b-2206-426b-af78-8af49515c693.jpg",
-      "seller": "lacosta fashion",
-      "rating": 4.5,
-      "brand": "J4",
-      "description": "black\ncomfatable shoes ",
-      "specs": [
-        "black",
-        "j4"
-      ]
-    },
-    {
-      "id": 134,
-      "name": "Tshirt",
-      "category": "Fashion",
-      "price": "200",
-      "oldPrice": "250",
-      "image": "https://cdn.phototourl.com/free/2026-08-18-40a658ce-edd4-4544-91fe-388c0f3c25a3.jpg",
-      "seller": "Lacosta Fashion",
-      "rating": 4.5,
-      "brand": "plain",
-      "description": "plain white tshirt",
-      "specs": [
-        "size",
-        "xl"
-      ]
-    },
-    {
-      "id": 135,
-      "name": "Tomatoes",
-      "category": "Groceries",
-      "price": "5@",
-      "oldPrice": "",
-      "image": "https://www.image2url.com/r2/default/images/1787084497472-610464c3-d6aa-4ae3-8b27-217681c18c35.jpeg",
-      "seller": "Tendawema",
-      "rating": 4.5,
-      "brand": "",
-      "subcategory": "Vegetables",
-      "description": "fresh large tomatoes for sale",
-      "specs": []
     }
   ],
   "deals": [
@@ -749,7 +669,7 @@
     "Secure checkout",
     "Fast delivery",
     "Verified sellers",
-    "Customer support call 0112974286"
+    "Customer support"
   ],
   "siteContent": {
     "hero": {
@@ -860,147 +780,6 @@
               "name": "Minute Maid",
               "brands": [
                 "Minute Maid"
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "category": "Fashion",
-      "groups": [
-        {
-          "name": "All Items",
-          "items": [
-            {
-              "name": "All Items",
-              "brands": [
-                "J4",
-                "Airmax",
-                "FOSA",
-                "mitumba",
-                "plain"
-              ]
-            },
-            {
-              "name": "Shoes",
-              "brands": [
-                "J4",
-                "Airmax",
-                "FOSA"
-              ]
-            },
-            {
-              "name": "Tshirt",
-              "brands": [
-                "Plain",
-                "mitumba"
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "category": "Phones & Tablets",
-      "groups": [
-        {
-          "name": "Laptops",
-          "items": [
-            {
-              "name": "All Items",
-              "brands": [
-                "HP",
-                "Lenovo",
-                "Thinkpad",
-                "Macbook",
-                "Dell"
-              ]
-            },
-            {
-              "name": "HP",
-              "brands": [
-                "Elitebook",
-                "Probook",
-                "Zbook"
-              ]
-            },
-            {
-              "name": "Lenovo",
-              "brands": [
-                "ThinkpadT80",
-                "ThinkpadT670"
-              ]
-            }
-          ]
-        },
-        {
-          "name": "Monitors",
-          "items": [
-            {
-              "name": "All Items",
-              "brands": [
-                "HP",
-                "Dell",
-                "Lenovo",
-                "Asus",
-                "Toshiba"
-              ]
-            },
-            {
-              "name": "HP screens",
-              "brands": [
-                "HPScreen"
-              ]
-            },
-            {
-              "name": "Dell",
-              "brands": [
-                "Dell-screen"
-              ]
-            },
-            {
-              "name": "Lenovo",
-              "brands": [
-                "Lenovo-screen"
-              ]
-            }
-          ]
-        },
-        {
-          "name": "phones",
-          "items": [
-            {
-              "name": "All Items",
-              "brands": [
-                "samsung",
-                "oppo",
-                "redmi"
-              ]
-            },
-            {
-              "name": "samsung",
-              "brands": [
-                "samsung"
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "category": "Groceries",
-      "groups": [
-        {
-          "name": "Vegetables",
-          "items": [
-            {
-              "name": "All items",
-              "brands": [
-                "Tomatoes",
-                "Onion",
-                "Carrots",
-                "Kales"
               ]
             }
           ]

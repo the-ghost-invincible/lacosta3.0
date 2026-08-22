@@ -12,6 +12,7 @@ import { VerifyEmail } from './VerifyEmail'
 import { CartProvider } from './CartContext'
 import { AuthProvider } from './AuthContext'
 import { UsernameSetup } from './UsernameSetup'
+import { PrivacyPolicy, TermsOfService, RefundPolicy } from './Legal'
 import './App.css'
 
 function App() {
@@ -30,6 +31,9 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/verify" element={<VerifyEmail />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
             <Route path={ADMIN_PATH} element={<AdminPage />} />
             <Route path={`${ADMIN_PATH}/products/new`} element={<AdminPage />} />
             <Route path={`${ADMIN_PATH}/products/:id/edit`} element={<AdminPage />} />

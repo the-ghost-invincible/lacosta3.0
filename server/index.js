@@ -1,15 +1,20 @@
 import 'dotenv/config'
 import express from 'express'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import cookieParser from 'cookie-parser'
 import multer from 'multer'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { config } from './config.js'
-import { initDb } from './db.js'
+import { initDb, pool } from './db.js'
 import { authRouter } from './auth.js'
 import { cartRouter } from './cart.js'
 import { orderRouter, orderAdminRouter, getCustomers } from './orders.js'
+import { paymentRouter } from './payment-routes.js'
+import { errorHandler } from './error-tracker.js'
+import { seoRouter } from './seo.js'
 
 const root = path.resolve(import.meta.dirname, '..')
 const dataFile = path.join(import.meta.dirname, 'data.json')
@@ -29,17 +34,139 @@ const SECTIONS = [
 
 const sessions = new Set()
 
-function readData() {
-  return JSON.parse(fs.readFileSync(dataFile, 'utf8'))
+// Cache for site data (refreshed periodically)
+let siteDataCache = null
+let siteDataCacheTime = 0
+const SITE_CACHE_TTL = 5000 // 5 seconds
+
+async function readData() {
+  try {
+    // Try to read from database first
+    const now = Date.now()
+    if (siteDataCache && now - siteDataCacheTime < SITE_CACHE_TTL) {
+      return siteDataCache
+    }
+
+    // Read site data sections from database
+    const result = await pool.query('SELECT section, value FROM site_data')
+    const dbData = {}
+    for (const row of result.rows) {
+      dbData[row.section] = row.value
+    }
+
+    // Read products from database
+    const productsResult = await pool.query(
+      'SELECT * FROM products WHERE active = true ORDER BY id'
+    )
+    dbData.catalogProducts = productsResult.rows.map(p => ({
+      id: p.id,
+      name: p.name,
+      category: p.category,
+      brand: p.brand,
+      subcategory: p.subcategory,
+      price: p.price,
+      oldPrice: p.old_price,
+      seller: p.seller,
+      rating: Number(p.rating),
+      image: p.image,
+      description: p.description,
+      specs: p.specs,
+      badge: p.badge,
+    }))
+
+    // Merge with fallback data from JSON file
+    const fallback = JSON.parse(fs.readFileSync(dataFile, 'utf8'))
+    siteDataCache = { ...fallback, ...dbData }
+    siteDataCacheTime = now
+    return siteDataCache
+  } catch (err) {
+    // Fallback to JSON file if database is unavailable
+    console.error('Database read failed, using JSON fallback:', err.message)
+    return JSON.parse(fs.readFileSync(dataFile, 'utf8'))
+  }
 }
 
-function writeData(data) {
-  const tmp = dataFile + '.tmp'
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2))
-  fs.renameSync(tmp, dataFile)
+async function writeSection(section, value) {
+  try {
+    await pool.query(
+      `INSERT INTO site_data (section, value, updated_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (section) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+      [section, JSON.stringify(value)]
+    )
+    siteDataCache = null // invalidate cache
+  } catch (err) {
+    // Fallback to JSON file
+    console.error('Database write failed, using JSON fallback:', err.message)
+    const data = JSON.parse(fs.readFileSync(dataFile, 'utf8'))
+    data[section] = value
+    const tmp = dataFile + '.tmp'
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2))
+    fs.renameSync(tmp, dataFile)
+  }
+}
+
+async function writeProduct(product) {
+  try {
+    if (product.id) {
+      await pool.query(
+        `UPDATE products SET name = $1, category = $2, brand = $3, subcategory = $4,
+         price = $5, old_price = $6, seller = $7, rating = $8, image = $9,
+         description = $10, specs = $11, badge = $12, updated_at = now()
+         WHERE id = $13`,
+        [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
+         product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
+         product.image ?? null, product.description ?? null, JSON.stringify(product.specs ?? []),
+         product.badge ?? null, product.id]
+      )
+    } else {
+      const maxResult = await pool.query('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM products')
+      const newId = maxResult.rows[0].next_id
+      await pool.query(
+        `INSERT INTO products (id, name, category, brand, subcategory, price, old_price, seller, rating, image, description, specs, badge)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        [newId, product.name, product.category, product.brand ?? null, product.subcategory ?? null,
+         product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
+         product.image ?? null, product.description ?? null, JSON.stringify(product.specs ?? []),
+         product.badge ?? null]
+      )
+      product.id = newId
+    }
+    siteDataCache = null
+    return product
+  } catch (err) {
+    console.error('Product write failed:', err.message)
+    throw err
+  }
 }
 
 const app = express()
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // disable for inline scripts in admin
+  crossOriginEmbedderPolicy: false,
+}))
+
+// General rate limiter: 100 requests per minute per IP
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+})
+app.use(generalLimiter)
+
+// Strict limiter for auth routes: 10 requests per minute per IP
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many auth attempts, please try again later' },
+})
+
 app.use(express.json({ limit: '2mb' }))
 app.use(cookieParser())
 
@@ -49,12 +176,23 @@ function requireAuth(req, res, next) {
 }
 
 // ---------- Public ----------
-app.get('/api/data', (_req, res) => {
-  res.json(readData())
+app.get('/api/data', async (_req, res) => {
+  const data = await readData()
+  res.json(data)
+})
+
+// ---------- Health check ----------
+app.get('/api/health', async (_req, res) => {
+  try {
+    await pool.query('SELECT 1')
+    res.json({ status: 'ok', db: 'connected', uptime: process.uptime() })
+  } catch {
+    res.status(503).json({ status: 'degraded', db: 'disconnected' })
+  }
 })
 
 // ---------- Users ----------
-app.use('/api/auth', authRouter)
+app.use('/api/auth', authLimiter, authRouter)
 
 // ---------- Cart (per user) ----------
 app.use('/api/cart', cartRouter)
@@ -64,8 +202,14 @@ app.use('/api/orders', orderRouter)
 app.get('/api/admin/customers', requireAuth, getCustomers)
 app.use('/api/admin/orders', requireAuth, orderAdminRouter)
 
-// ---------- Auth ----------
-app.post('/api/login', (req, res) => {
+// ---------- Payments ----------
+app.use('/api/payments', paymentRouter)
+
+// ---------- SEO (sitemap, robots.txt) ----------
+app.use(seoRouter)
+
+// ---------- Auth (admin login) ----------
+app.post('/api/login', authLimiter, (req, res) => {
   const { password } = req.body ?? {}
   if (password === config.adminPassword) {
     const token = crypto.randomBytes(24).toString('hex')
@@ -92,13 +236,43 @@ app.get('/api/admin/me', (req, res) => {
 })
 
 // ---------- Admin: data ----------
-app.put('/api/admin/data', requireAuth, (req, res) => {
+app.put('/api/admin/data', requireAuth, async (req, res) => {
   const { section, value } = req.body ?? {}
   if (!SECTIONS.includes(section)) return res.status(400).json({ error: 'Unknown section' })
-  const data = readData()
-  data[section] = value
-  writeData(data)
+  await writeSection(section, value)
   res.json({ ok: true })
+})
+
+// ---------- Admin: products ----------
+app.post('/api/admin/products', requireAuth, async (req, res) => {
+  try {
+    const product = req.body ?? {}
+    const result = await writeProduct(product)
+    res.json({ ok: true, product: result })
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to save product' })
+  }
+})
+
+app.put('/api/admin/products', requireAuth, async (req, res) => {
+  try {
+    const product = req.body ?? {}
+    if (!product.id) return res.status(400).json({ error: 'Product id is required' })
+    const result = await writeProduct(product)
+    res.json({ ok: true, product: result })
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to save product' })
+  }
+})
+
+app.delete('/api/admin/products/:id', requireAuth, async (req, res) => {
+  try {
+    await pool.query('UPDATE products SET active = false WHERE id = $1', [req.params.id])
+    siteDataCache = null
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to delete product' })
+  }
 })
 
 // ---------- Admin: ngrok tunnel ----------
@@ -148,6 +322,9 @@ if (fs.existsSync(dist)) {
     res.sendFile(path.join(dist, 'index.html'))
   })
 }
+
+// ---------- Error handler ----------
+app.use(errorHandler)
 
 app.listen(config.port, () => {
   console.log(`Lacosta API + admin running on http://localhost:${config.port}`)

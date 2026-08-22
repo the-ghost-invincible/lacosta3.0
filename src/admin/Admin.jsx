@@ -7,9 +7,13 @@ export const ADMIN_PATH = '/admin-7f3k9'
 const ACCENTS = ['orange', 'blue', 'pink', 'green', 'purple', 'red', 'yellow', 'cyan']
 
 async function api(path, options = {}) {
+  const isFormData = options.body instanceof FormData
   const res = await fetch(path, {
-    headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
     ...options,
+    headers: {
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(options.headers ?? {}),
+    },
   })
   return res
 }
@@ -128,20 +132,33 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
   const editingProduct = isNewProduct
     ? { ...emptyProduct(), category: db?.categories?.find((c) => c.name !== 'All')?.name ?? '' }
     : editProductId != null
-      ? (db?.catalogProducts ?? []).find((p) => p.id === editProductId) ?? null
+      ? (db?.catalogProducts ?? []).find((p) => Number(p.id) === editProductId) ?? null
       : null
   const onProductEditor = Boolean(editingProduct)
 
-  const saveProduct = (product) => {
-    const products = db.catalogProducts
-    let next
-    if (product.id) {
-      next = products.map((p) => (p.id === product.id ? product : p))
-    } else {
-      const newId = Math.max(0, ...products.map((p) => p.id)) + 1
-      next = [...products, { ...product, id: newId }]
+  const saveProduct = async (product) => {
+    try {
+      const res = await api('/api/admin/products', {
+        method: product.id ? 'PUT' : 'POST',
+        body: JSON.stringify(product),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const products = db.catalogProducts
+        let next
+        if (product.id) {
+          next = products.map((p) => (Number(p.id) === Number(product.id) ? data.product : p))
+        } else {
+          next = [...products, data.product]
+        }
+        setDb((prev) => ({ ...prev, catalogProducts: next }))
+        flash('Product saved')
+      } else {
+        flash('Save failed')
+      }
+    } catch {
+      flash('Save failed')
     }
-    save('catalogProducts', next)
   }
 
   const logout = async () => {
@@ -400,9 +417,12 @@ function ProductsTab({ products, onSave }) {
     (p.name + ' ' + (p.brand ?? '') + ' ' + p.category).toLowerCase().includes(query.toLowerCase())
   )
 
-  const removeProduct = (id) => {
+  const removeProduct = async (id) => {
     if (!confirm('Delete this product?')) return
-    onSave(products.filter((p) => p.id !== id))
+    const res = await api(`/api/admin/products/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      onSave(products.filter((p) => p.id !== id))
+    }
   }
 
   return (

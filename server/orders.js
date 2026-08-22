@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { pool } from './db.js'
 import { userFromSession } from './auth.js'
+import { sendEmail } from './email.js'
 
 const STATUSES = ['pending', 'confirmed', 'canceled', 'delivered']
 
@@ -32,7 +33,44 @@ orderRouter.post('/', requireUser, async (req, res) => {
      VALUES ($1, $2, $3, $4, $5, $6, 'pending') RETURNING *`,
     [req.user.id, name, phone, req.user.email, JSON.stringify(items), `KSh ${total.toLocaleString()}`]
   )
-  res.json({ ok: true, order: result.rows[0] })
+
+  const order = result.rows[0]
+
+  // Send order confirmation email
+  const itemsList = items.map(i =>
+    `<tr>
+      <td style="padding:8px;border-bottom:1px solid #eee">${i.name}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.qty ?? 1}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${i.price}</td>
+    </tr>`
+  ).join('')
+
+  sendEmail({
+    to: req.user.email,
+    subject: `Order #${order.id} received — Lacosta`,
+    html: `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+        <h2 style="color:#65a30d">Order confirmed!</h2>
+        <p>Hi ${name},</p>
+        <p>We've received your order <strong>#${order.id}</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <thead>
+            <tr style="background:#f5f5f5">
+              <th style="padding:8px;text-align:left">Item</th>
+              <th style="padding:8px;text-align:center">Qty</th>
+              <th style="padding:8px;text-align:right">Price</th>
+            </tr>
+          </thead>
+          <tbody>${itemsList}</tbody>
+        </table>
+        <p style="font-size:18px"><strong>Total: ${order.total}</strong></p>
+        <p>We'll contact you at <strong>${phone}</strong> to confirm delivery details.</p>
+        <p style="color:#666;font-size:14px">If you have any questions, reply to this email or call 0112974286.</p>
+      </div>
+    `,
+  }).catch(() => {})
+
+  res.json({ ok: true, order })
 })
 
 export const orderAdminRouter = Router()
@@ -73,7 +111,34 @@ orderAdminRouter.put('/:id/status', async (req, res) => {
     [status, req.params.id]
   )
   if (result.rowCount === 0) return res.status(404).json({ error: 'Order not found' })
-  res.json({ ok: true, order: result.rows[0] })
+
+  const order = result.rows[0]
+
+  // Send status update email to customer
+  const statusMessages = {
+    confirmed: { title: 'Order confirmed', body: 'Your order has been confirmed and is being prepared for delivery.' },
+    canceled: { title: 'Order canceled', body: 'Your order has been canceled. If you have questions, contact us.' },
+    delivered: { title: 'Order delivered', body: 'Your order has been delivered. Thank you for shopping with Lacosta!' },
+  }
+
+  if (order.email && statusMessages[status]) {
+    sendEmail({
+      to: order.email,
+      subject: `Order #${order.id} ${statusMessages[status].title} — Lacosta`,
+      html: `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+          <h2 style="color:#65a30d">${statusMessages[status].title}</h2>
+          <p>Hi ${order.name},</p>
+          <p>${statusMessages[status].body}</p>
+          <p><strong>Order #${order.id}</strong></p>
+          <p><strong>Items:</strong> ${(order.items ?? []).map(i => `${i.name} x${i.qty ?? 1}`).join(', ')}</p>
+          <p><strong>Total:</strong> ${order.total}</p>
+        </div>
+      `,
+    }).catch(() => {})
+  }
+
+  res.json({ ok: true, order })
 })
 
 // Delete an order permanently (admin)
