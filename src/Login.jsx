@@ -14,11 +14,16 @@ export function LoginPage() {
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [needsVerify, setNeedsVerify] = useState(false)
+  const [resendMsg, setResendMsg] = useState(null)
+  const [resendBusy, setResendBusy] = useState(false)
 
   const submit = async (e) => {
     e.preventDefault()
     setError(null)
     setNotice(null)
+    setNeedsVerify(false)
+    setResendMsg(null)
 
     if (mode === 'register' && password !== confirm) {
       setError('Passwords do not match')
@@ -29,8 +34,12 @@ export function LoginPage() {
     if (mode === 'login') {
       const err = await login(email, password)
       setBusy(false)
-      if (err) setError(err)
-      else navigate('/account')
+      if (err) {
+        if (err.includes('verify')) {
+          setNeedsVerify(true)
+        }
+        setError(err)
+      } else navigate('/account')
     } else {
       const err = await register(email, password)
       setBusy(false)
@@ -44,10 +53,29 @@ export function LoginPage() {
     }
   }
 
+  const resendVerification = async () => {
+    setResendBusy(true)
+    setResendMsg(null)
+    try {
+      const res = await fetch('/api/auth/verify/resend-public', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const data = await res.json().catch(() => ({}))
+      setResendMsg('Verification email sent! Check your inbox.')
+    } catch {
+      setResendMsg('Could not send email. Try again.')
+    }
+    setResendBusy(false)
+  }
+
   const switchMode = (next) => {
     setMode(next)
     setError(null)
     setNotice(null)
+    setNeedsVerify(false)
+    setResendMsg(null)
     setPassword('')
     setConfirm('')
   }
@@ -68,6 +96,22 @@ export function LoginPage() {
           <form onSubmit={submit}>
             {notice && <p className="auth-notice">{notice}</p>}
             {error && <p className="error">{error}</p>}
+            {needsVerify && (
+              <div className="verify-banner" style={{ marginTop: '0.5rem' }}>
+                {resendMsg ? (
+                  <span>{resendMsg}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="text-btn"
+                    disabled={resendBusy}
+                    onClick={resendVerification}
+                  >
+                    {resendBusy ? 'Sending…' : 'Resend verification email'}
+                  </button>
+                )}
+              </div>
+            )}
 
             <label className="form-field">
               <span>Email</span>

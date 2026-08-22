@@ -68,7 +68,7 @@ router.post('/register', async (req, res) => {
   }
 
   const result = await pool.query(
-    `INSERT INTO users (email, password_hash, verified) VALUES ($1, $2, true) RETURNING *`,
+    `INSERT INTO users (email, password_hash, verified) VALUES ($1, $2, false) RETURNING *`,
     [email, hashPassword(password)]
   )
   const user = result.rows[0]
@@ -105,6 +105,10 @@ router.post('/login', async (req, res) => {
   const user = result.rows[0]
   if (!user || !verifyPassword(password, user.password_hash)) {
     return res.status(401).json({ error: 'Incorrect email or password' })
+  }
+
+  if (!user.verified) {
+    return res.status(403).json({ error: 'Please verify your email before logging in. Check your inbox for the verification link.' })
   }
 
   await createSession(res, user.id, req)
@@ -250,6 +254,40 @@ router.post('/verify/resend', async (req, res) => {
   const verifyUrl = `${config.baseUrl}/verify?token=${token}`
   sendEmail({
     to: user.email,
+    subject: 'Verify your Lacosta account',
+    html: `<p>Click the link below to verify your email address:</p>
+           <p><a href="${verifyUrl}">Verify email</a></p>
+           <p>This link expires in 24 hours.</p>`,
+  }).catch(() => {})
+
+  res.json({ ok: true })
+})
+
+// ---------- Resend verification (public, for unverified users) ----------
+router.post('/verify/resend-public', async (req, res) => {
+  const email = String(req.body?.email ?? '').trim().toLowerCase()
+  if (!EMAIL_RE.test(email)) {
+    return res.status(400).json({ error: 'Enter a valid email address' })
+  }
+
+  const result = await pool.query('SELECT id, verified FROM users WHERE LOWER(email) = LOWER($1)', [email])
+  const user = result.rows[0]
+
+  // Always return success to prevent email enumeration
+  if (!user || user.verified) return res.json({ ok: true })
+
+  await pool.query("DELETE FROM tokens WHERE user_id = $1 AND type = 'verify'", [user.id])
+
+  const token = crypto.randomBytes(32).toString('hex')
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  await pool.query(
+    'INSERT INTO tokens (user_id, type, token, expires_at) VALUES ($1, $2, $3, $4)',
+    [user.id, 'verify', token, expires]
+  )
+
+  const verifyUrl = `${config.baseUrl}/verify?token=${token}`
+  sendEmail({
+    to: email,
     subject: 'Verify your Lacosta account',
     html: `<p>Click the link below to verify your email address:</p>
            <p><a href="${verifyUrl}">Verify email</a></p>
