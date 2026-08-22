@@ -356,7 +356,7 @@ export function CategoryPage() {
                         <strong>{product.price}</strong>
                         <span>{product.oldPrice}</span>
                       </div>
-                      <button type="button" onClick={(event) => { event.stopPropagation(); handleAdd(product) }}>{justAddedId === product.id ? "Added ✓" : "Add to cart"}</button>
+                      <button type="button" disabled={product.outOfStock} onClick={(event) => { event.stopPropagation(); handleAdd(product) }}>{justAddedId === product.id ? "Added ✓" : product.outOfStock ? "Out of stock" : "Add to cart"}</button>
                     </div>
                   </article>
                 ))}
@@ -375,7 +375,7 @@ export function CategoryPage() {
                 </div>
 
                 <div className="detail-meta">
-                  <span className="detail-badge">In stock</span>
+                  <span className={`detail-badge ${currentProduct.outOfStock ? 'out-of-stock' : ''}`}>{currentProduct.outOfStock ? 'Out of stock' : 'In stock'}</span>
                   <span className="detail-rating">★ {currentProduct.rating}</span>
                 </div>
 
@@ -394,7 +394,7 @@ export function CategoryPage() {
                 </div>
 
                 <div className="detail-actions">
-                  <button type="button" className="primary-btn" onClick={() => handleAdd(currentProduct)}>{justAddedId === currentProduct.id ? "Added ✓" : "Add to cart"}</button>
+                  <button type="button" className="primary-btn" disabled={currentProduct.outOfStock} onClick={() => handleAdd(currentProduct)}>{justAddedId === currentProduct.id ? "Added ✓" : currentProduct.outOfStock ? "Out of stock" : "Add to cart"}</button>
                   <button type="button" className="secondary-btn">Buy now</button>
                 </div>
 

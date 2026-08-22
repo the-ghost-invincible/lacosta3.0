@@ -107,7 +107,11 @@ export function Home() {
             <article key={product.id} className="product-card" onClick={() => setModalProduct(product)}>
               <div className="card-image-wrap">
                 <img src={product.image} alt={product.name} />
-                <span className="product-badge">{product.badge}</span>
+                {product.outOfStock ? (
+                  <span className="product-badge" style={{ background: '#dc2626', color: '#fff' }}>Out of stock</span>
+                ) : (
+                  <span className="product-badge">{product.badge}</span>
+                )}
               </div>
               <div className="card-body">
                 <h3>{product.name}</h3>
@@ -115,7 +119,7 @@ export function Home() {
                   <strong>{product.price}</strong>
                   <span>{product.oldPrice}</span>
                 </div>
-                <button type="button" onClick={(event) => { event.stopPropagation(); handleAdd(product) }}>{justAddedId === product.id ? "Added ✓" : "Add to cart"}</button>
+                <button type="button" disabled={product.outOfStock} onClick={(event) => { event.stopPropagation(); handleAdd(product) }}>{justAddedId === product.id ? "Added ✓" : product.outOfStock ? "Out of stock" : "Add to cart"}</button>
               </div>
             </article>
           ))}
@@ -165,7 +169,7 @@ export function Home() {
                       <strong>{product.price}</strong>
                       <span>{product.oldPrice}</span>
                     </div>
-                    <button type="button" onClick={(event) => { event.stopPropagation(); handleAdd(product) }}>{justAddedId === product.id ? "Added ✓" : "Add to cart"}</button>
+                    <button type="button" disabled={product.outOfStock} onClick={(event) => { event.stopPropagation(); handleAdd(product) }}>{justAddedId === product.id ? "Added ✓" : product.outOfStock ? "Out of stock" : "Add to cart"}</button>
                   </div>
                 </article>
               ))}
@@ -178,7 +182,7 @@ export function Home() {
             </div>
 
             <div className="detail-meta">
-              <span className="detail-badge">In stock</span>
+              <span className={`detail-badge ${currentProduct.outOfStock ? 'out-of-stock' : ''}`}>{currentProduct.outOfStock ? 'Out of stock' : 'In stock'}</span>
               <span className="detail-rating">★ {currentProduct.rating}</span>
             </div>
 
@@ -197,7 +201,7 @@ export function Home() {
             </div>
 
             <div className="detail-actions">
-              <button type="button" className="primary-btn" onClick={() => handleAdd(currentProduct)}>{justAddedId === currentProduct.id ? "Added ✓" : "Add to cart"}</button>
+              <button type="button" className="primary-btn" disabled={currentProduct.outOfStock} onClick={() => handleAdd(currentProduct)}>{justAddedId === currentProduct.id ? "Added ✓" : currentProduct.outOfStock ? "Out of stock" : "Add to cart"}</button>
               <button type="button" className="secondary-btn">Buy now</button>
             </div>
 

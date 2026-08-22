@@ -328,6 +328,7 @@ function emptyProduct() {
     subcategory: '',
     description: '',
     specs: [],
+    outOfStock: false,
   }
 }
 
@@ -400,6 +401,19 @@ function ProductForm({ initial, categories, onSave, onCancel }) {
           <label>Specs (comma separated)</label>
           <input value={(product.specs ?? []).join(', ')} onChange={(e) => set('specs', e.target.value.split(',').map((s) => s.trim()))} placeholder="330ml bottle, Carbonated, …" />
         </div>
+        <div className="form-field full">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={product.outOfStock ?? false}
+              onChange={(e) => set('outOfStock', e.target.checked)}
+            />
+            Out of stock
+          </label>
+          <small className="muted" style={{ display: 'block', marginTop: '4px' }}>
+            Mark this product as out of stock. It will still appear in the store but show an "Out of stock" badge.
+          </small>
+        </div>
       </div>
       <div className="form-actions">
         <button type="button" className="btn ghost" onClick={onCancel}>Cancel</button>
@@ -449,7 +463,7 @@ function ProductsTab({ products, onSave }) {
               {filtered.map((p) => (
                 <tr key={p.id}>
                   <td>{p.image && <img src={p.image} alt="" />}</td>
-                  <td><strong>{p.name}</strong>{p.brand ? <div className="muted">{p.brand}{p.subcategory ? ` · ${p.subcategory}` : ''}</div> : null}</td>
+                  <td><strong>{p.name}</strong>{p.outOfStock ? <span style={{ color: '#dc2626', fontSize: '0.75rem', fontWeight: 700, marginLeft: '6px' }}>OUT OF STOCK</span> : null}{p.brand ? <div className="muted">{p.brand}{p.subcategory ? ` · ${p.subcategory}` : ''}</div> : null}</td>
                   <td>{p.category}</td>
                   <td>{p.price}</td>
                   <td>★ {p.rating}</td>

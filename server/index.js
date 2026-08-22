@@ -72,6 +72,7 @@ async function readData() {
       description: p.description,
       specs: p.specs,
       badge: p.badge,
+      outOfStock: p.out_of_stock,
     }))
 
     // Merge with fallback data from JSON file
@@ -112,23 +113,23 @@ async function writeProduct(product) {
       await pool.query(
         `UPDATE products SET name = $1, category = $2, brand = $3, subcategory = $4,
          price = $5, old_price = $6, seller = $7, rating = $8, image = $9,
-         description = $10, specs = $11, badge = $12, updated_at = now()
-         WHERE id = $13`,
+         description = $10, specs = $11, badge = $12, out_of_stock = $13, updated_at = now()
+         WHERE id = $14`,
         [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
          product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
          product.image ?? null, product.description ?? null, JSON.stringify(product.specs ?? []),
-         product.badge ?? null, product.id]
+         product.badge ?? null, product.outOfStock ?? false, product.id]
       )
     } else {
       const maxResult = await pool.query('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM products')
       const newId = maxResult.rows[0].next_id
       await pool.query(
-        `INSERT INTO products (id, name, category, brand, subcategory, price, old_price, seller, rating, image, description, specs, badge)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        `INSERT INTO products (id, name, category, brand, subcategory, price, old_price, seller, rating, image, description, specs, badge, out_of_stock)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
         [newId, product.name, product.category, product.brand ?? null, product.subcategory ?? null,
          product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
          product.image ?? null, product.description ?? null, JSON.stringify(product.specs ?? []),
-         product.badge ?? null]
+         product.badge ?? null, product.outOfStock ?? false]
       )
       product.id = newId
     }

@@ -835,6 +835,13 @@
   box-shadow: 0 16px 28px rgba(132, 204, 22, 0.35);
 }
 
+.primary-btn:disabled {
+  background: #9ca3af;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .secondary-btn {
   color: var(--text);
   background: var(--bg-surface);
@@ -1230,6 +1237,16 @@
   padding: 6px 10px;
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.detail-badge.out-of-stock {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+:root[data-theme='dark'] .detail-badge.out-of-stock {
+  color: #fca5a5;
+  background: #3c1520;
 }
 
 .detail-rating {

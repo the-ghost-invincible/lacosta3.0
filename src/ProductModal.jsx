@@ -49,8 +49,8 @@ export function ProductModal({ product, onClose }) {
             </div>
           )}
 
-          <button type="button" className="primary-btn product-modal-add" onClick={handleAdd}>
-            {justAdded ? 'Added ✓' : 'Add to cart'}
+          <button type="button" className="primary-btn product-modal-add" disabled={product.outOfStock} onClick={handleAdd}>
+            {justAdded ? 'Added ✓' : product.outOfStock ? 'Out of stock' : 'Add to cart'}
           </button>
         </div>
       </div>
