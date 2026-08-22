@@ -472,6 +472,10 @@ const STATUS_LABELS = { pending: 'Pending', confirmed: 'Confirmed', canceled: 'C
 function CustomersTab() {
   const [customers, setCustomers] = useState([])
   const [refreshing, setRefreshing] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteError, setDeleteError] = useState(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
 
   const load = async () => {
     setRefreshing(true)
@@ -490,6 +494,29 @@ function CustomersTab() {
     const id = setInterval(load, 15000)
     return () => clearInterval(id)
   }, [])
+
+  const deleteUser = async () => {
+    if (!deleteTarget) return
+    setDeleteBusy(true)
+    setDeleteError(null)
+    try {
+      const res = await api(`/api/admin/orders/user/${deleteTarget.id}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ password: deletePassword }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setCustomers((prev) => prev.filter((c) => c.id !== deleteTarget.id))
+        setDeleteTarget(null)
+        setDeletePassword('')
+      } else {
+        setDeleteError(data.error ?? 'Delete failed')
+      }
+    } catch {
+      setDeleteError('Network error')
+    }
+    setDeleteBusy(false)
+  }
 
   const parsePrice = (price) => Number(String(price ?? '').replace(/[^\d]/g, '')) || 0
   const cartTotal = (items) => (items ?? []).reduce((s, i) => s + parsePrice(i.price) * (i.qty ?? 1), 0)
@@ -521,6 +548,7 @@ function CustomersTab() {
                 <th>Cart (live)</th>
                 <th>Total</th>
                 <th>Last active</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -548,11 +576,46 @@ function CustomersTab() {
                     </td>
                     <td className="nowrap">{items.length ? `KSh ${cartTotal(items).toLocaleString()}` : '—'}</td>
                     <td className="nowrap muted">{fmtTime(c.lastActive)}</td>
+                    <td className="nowrap">
+                      <button
+                        type="button"
+                        className="btn danger small"
+                        onClick={() => { setDeleteTarget(c); setDeletePassword(''); setDeleteError(null) }}
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="admin-modal-overlay" onClick={() => setDeleteTarget(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Delete user</h2>
+            <p>Are you sure you want to permanently delete <strong>{deleteTarget.email}</strong>? This cannot be undone.</p>
+            <label className="form-field">
+              <span>Enter admin password to confirm</span>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="Admin password"
+                autoFocus
+              />
+            </label>
+            {deleteError && <p className="error">{deleteError}</p>}
+            <div className="form-actions">
+              <button type="button" className="btn ghost" onClick={() => setDeleteTarget(null)}>Cancel</button>
+              <button type="button" className="btn danger" disabled={deleteBusy || !deletePassword} onClick={deleteUser}>
+                {deleteBusy ? 'Deleting…' : 'Delete user'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

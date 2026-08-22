@@ -141,6 +141,23 @@ orderAdminRouter.put('/:id/status', async (req, res) => {
   res.json({ ok: true, order })
 })
 
+// Delete a user permanently (admin, requires password confirmation)
+orderAdminRouter.delete('/user/:id', async (req, res) => {
+  const password = String(req.body?.password ?? '')
+  if (!password) return res.status(400).json({ error: 'Password required' })
+
+  const { config } = await import('./config.js')
+  if (password !== config.adminPassword) {
+    return res.status(403).json({ error: 'Incorrect password' })
+  }
+
+  const userId = req.params.id
+  const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id, email', [userId])
+  if (result.rowCount === 0) return res.status(404).json({ error: 'User not found' })
+
+  res.json({ ok: true, deleted: result.rows[0] })
+})
+
 // Delete an order permanently (admin)
 orderAdminRouter.delete('/:id', async (req, res) => {
   const result = await pool.query('DELETE FROM orders WHERE id = $1 RETURNING id', [
