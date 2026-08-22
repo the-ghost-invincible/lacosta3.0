@@ -136,7 +136,7 @@ export function LoginPage() {
               />
             </label>
 
-            {mode === 'login' && (
+            {mode === 'login' && !notice && (
               <div className="auth-row">
                 <Link to="/forgot-password" className="text-btn">Forgot password?</Link>
               </div>
