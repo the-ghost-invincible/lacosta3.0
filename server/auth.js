@@ -1,6 +1,8 @@
 import { Router } from 'express'
 import crypto from 'node:crypto'
 import { pool } from './db.js'
+import { sendEmail } from './email.js'
+import { config } from './config.js'
 
 const router = Router()
 
@@ -24,6 +26,7 @@ const publicUser = (row) => ({
   displayName: row.display_name,
   avatar: row.avatar,
   phone: row.phone ?? null,
+  verified: row.verified ?? true,
 })
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -65,10 +68,29 @@ router.post('/register', async (req, res) => {
   }
 
   const result = await pool.query(
-    `INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING *`,
+    `INSERT INTO users (email, password_hash, verified) VALUES ($1, $2, false) RETURNING *`,
     [email, hashPassword(password)]
   )
-  res.json({ ok: true, user: publicUser(result.rows[0]) })
+  const user = result.rows[0]
+
+  const token = crypto.randomBytes(32).toString('hex')
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  await pool.query(
+    'INSERT INTO tokens (user_id, type, token, expires_at) VALUES ($1, $2, $3, $4)',
+    [user.id, 'verify', token, expires]
+  )
+
+  const verifyUrl = `${config.baseUrl}/verify?token=${token}`
+  sendEmail({
+    to: email,
+    subject: 'Verify your Lacosta account',
+    html: `<p>Welcome to Lacosta!</p>
+           <p>Click the link below to verify your email address:</p>
+           <p><a href="${verifyUrl}">Verify email</a></p>
+           <p>This link expires in 24 hours.</p>`,
+  }).catch(() => {})
+
+  res.json({ ok: true, user: publicUser(user) })
 })
 
 // ---------- Log in (email + password) ----------
@@ -191,6 +213,112 @@ router.put('/name', async (req, res) => {
     [name, user.id]
   )
   res.json({ user: publicUser(result.rows[0]) })
+})
+
+// ---------- Verify email ----------
+router.get('/verify', async (req, res) => {
+  const token = String(req.query?.token ?? '')
+  if (!token) return res.status(400).json({ error: 'Invalid link' })
+
+  const result = await pool.query(
+    'SELECT * FROM tokens WHERE token = $1 AND type = $2 AND expires_at > now()',
+    [token, 'verify']
+  )
+  const row = result.rows[0]
+  if (!row) return res.status(400).json({ error: 'Invalid or expired verification link' })
+
+  await pool.query('UPDATE users SET verified = true WHERE id = $1', [row.user_id])
+  await pool.query('DELETE FROM tokens WHERE id = $1', [row.id])
+  res.json({ ok: true })
+})
+
+// ---------- Resend verification email ----------
+router.post('/verify/resend', async (req, res) => {
+  const user = await userFromSession(req)
+  if (!user) return res.status(401).json({ error: 'Not signed in' })
+  if (user.verified) return res.json({ ok: true, message: 'Already verified' })
+
+  await pool.query("DELETE FROM tokens WHERE user_id = $1 AND type = 'verify'", [user.id])
+
+  const token = crypto.randomBytes(32).toString('hex')
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  await pool.query(
+    'INSERT INTO tokens (user_id, type, token, expires_at) VALUES ($1, $2, $3, $4)',
+    [user.id, 'verify', token, expires]
+  )
+
+  const verifyUrl = `${config.baseUrl}/verify?token=${token}`
+  sendEmail({
+    to: user.email,
+    subject: 'Verify your Lacosta account',
+    html: `<p>Click the link below to verify your email address:</p>
+           <p><a href="${verifyUrl}">Verify email</a></p>
+           <p>This link expires in 24 hours.</p>`,
+  }).catch(() => {})
+
+  res.json({ ok: true })
+})
+
+// ---------- Forgot password ----------
+router.post('/forgot-password', async (req, res) => {
+  const email = String(req.body?.email ?? '').trim().toLowerCase()
+  if (!EMAIL_RE.test(email)) {
+    return res.status(400).json({ error: 'Enter a valid email address' })
+  }
+
+  const result = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email])
+  const user = result.rows[0]
+
+  // Always return success to prevent email enumeration
+  if (!user) return res.json({ ok: true })
+
+  await pool.query("DELETE FROM tokens WHERE user_id = $1 AND type = 'reset'", [user.id])
+
+  const token = crypto.randomBytes(32).toString('hex')
+  const expires = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+  await pool.query(
+    'INSERT INTO tokens (user_id, type, token, expires_at) VALUES ($1, $2, $3, $4)',
+    [user.id, 'reset', token, expires]
+  )
+
+  const resetUrl = `${config.baseUrl}/reset-password?token=${token}`
+  sendEmail({
+    to: email,
+    subject: 'Reset your Lacosta password',
+    html: `<p>You requested a password reset.</p>
+           <p><a href="${resetUrl}">Set new password</a></p>
+           <p>This link expires in 1 hour. If you didn't request this, ignore this email.</p>`,
+  }).catch(() => {})
+
+  res.json({ ok: true })
+})
+
+// ---------- Reset password ----------
+router.post('/reset-password', async (req, res) => {
+  const token = String(req.body?.token ?? '')
+  const password = String(req.body?.password ?? '')
+
+  if (!token) return res.status(400).json({ error: 'Invalid link' })
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' })
+  }
+
+  const result = await pool.query(
+    'SELECT * FROM tokens WHERE token = $1 AND type = $2 AND expires_at > now()',
+    [token, 'reset']
+  )
+  const row = result.rows[0]
+  if (!row) return res.status(400).json({ error: 'Invalid or expired reset link' })
+
+  await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [
+    hashPassword(password),
+    row.user_id,
+  ])
+  await pool.query('DELETE FROM tokens WHERE id = $1', [row.id])
+  // Kill all sessions for this user so they must re-login with the new password
+  await pool.query('DELETE FROM sessions WHERE user_id = $1', [row.user_id])
+
+  res.json({ ok: true })
 })
 
 export const authRouter = router

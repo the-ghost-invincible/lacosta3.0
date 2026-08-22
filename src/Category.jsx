@@ -4,9 +4,8 @@ import { useSiteData } from './useSiteData'
 import { useCart } from './CartContext'
 import { ProductModal } from './ProductModal'
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { parsePrice, normalize } from './utils'
 import './App.css'
-
-const parsePrice = (price) => Number(String(price ?? '').replace(/[^\d]/g, '')) || 0
 
 export function CategoryPage() {
   const { categorySlug } = useParams()
@@ -107,8 +106,6 @@ export function CategoryPage() {
       setOpenMenu(null)
     }
   }, [groupParam, itemParam, menu])
-
-  const normalize = (value) => (value ?? '').trim().toLowerCase()
 
   // A product belongs to a menu group when it has no subcategory assigned
   // (unassigned products show in every group) or its subcategory matches

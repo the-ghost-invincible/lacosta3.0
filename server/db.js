@@ -52,6 +52,17 @@ const ORDERS_TABLE = `
   )
 `
 
+const TOKENS_TABLE = `
+  CREATE TABLE IF NOT EXISTS tokens (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL CHECK (type IN ('verify', 'reset')),
+    token TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )
+`
+
 export async function initDb() {
   await pool.query(USERS_TABLE)
   await pool.query(SESSIONS_TABLE)
@@ -63,5 +74,7 @@ export async function initDb() {
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT"
   )
   await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT")
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT true")
   await pool.query("ALTER TABLE users DROP COLUMN IF EXISTS google_id")
+  await pool.query(TOKENS_TABLE)
 }

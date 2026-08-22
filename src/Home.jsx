@@ -3,9 +3,8 @@ import { useSiteData } from './useSiteData'
 import { useCart } from './CartContext'
 import { ProductModal } from './ProductModal'
 import { useState, useMemo, useRef } from 'react'
+import { parsePrice } from './utils'
 import './App.css'
-
-const parsePrice = (price) => Number(String(price ?? '').replace(/[^\d]/g, '')) || 0
 
 export function Home() {
   const { catalogProducts, featuredProducts, deals, trendingProducts, benefits, siteContent } = useSiteData()

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Header } from './Header'
 import { useAuth } from './AuthContext'
 import './App.css'
@@ -36,7 +36,7 @@ export function LoginPage() {
       setBusy(false)
       if (err) setError(err)
       else {
-        setNotice('Account created! Log in with your email and password.')
+        setNotice('Account created! Check your email to verify your account, then log in.')
         setPassword('')
         setConfirm('')
         setMode('login')
@@ -91,6 +91,12 @@ export function LoginPage() {
                 required
               />
             </label>
+
+            {mode === 'login' && (
+              <div className="auth-row">
+                <Link to="/forgot-password" className="text-btn">Forgot password?</Link>
+              </div>
+            )}
 
             {mode === 'register' && (
               <label className="form-field">

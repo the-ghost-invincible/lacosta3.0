@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSiteData } from './useSiteData'
 import { useCart } from './CartContext'
 import { useAuth } from './AuthContext'
+import { normalize } from './utils'
 import './App.css'
 
 export function categorySlug(name) {
@@ -20,24 +21,24 @@ export function Header() {
   const searchRef = useRef(null)
 
   const categoryResults = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = normalize(query)
     if (!q) return []
     return categories
-      .filter((c) => c.name !== 'All' && c.name.toLowerCase().startsWith(q))
+      .filter((c) => c.name !== 'All' && normalize(c.name).includes(q))
       .slice(0, 3)
   }, [query, categories])
 
   const subcategoryResults = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = normalize(query)
     if (!q) return []
     const out = []
     for (const menu of categoryMenus ?? []) {
       for (const group of menu.groups ?? []) {
-        if ((group.name ?? '').toLowerCase().startsWith(q)) {
+        if (normalize(group.name).includes(q)) {
           out.push({ type: 'group', menu, group, label: group.name })
         }
         for (const item of group.items ?? []) {
-          if ((item.name ?? '').toLowerCase().startsWith(q)) {
+          if (normalize(item.name).includes(q)) {
             out.push({ type: 'item', menu, group, item, label: item.name })
           }
         }
@@ -47,17 +48,41 @@ export function Header() {
   }, [query, categoryMenus])
 
   const productResults = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = normalize(query)
     if (!q) return []
     return catalogProducts
       .filter(
         (p) =>
-          (p.name ?? '').toLowerCase().startsWith(q) ||
-          (p.brand ?? '').toLowerCase().startsWith(q) ||
-          (p.category ?? '').toLowerCase().startsWith(q)
+          normalize(p.name).includes(q) ||
+          normalize(p.brand).includes(q) ||
+          normalize(p.category).includes(q) ||
+          normalize(p.description).includes(q) ||
+          (p.specs ?? []).some((s) => normalize(s).includes(q))
       )
       .slice(0, 8)
   }, [query, catalogProducts])
+
+  const autocompleteSuggestions = useMemo(() => {
+    const q = normalize(query)
+    if (!q || q.length < 2) return []
+    const seen = new Set()
+    const out = []
+    for (const p of catalogProducts) {
+      const name = p.name
+      if (normalize(name).includes(q) && !seen.has(name)) {
+        seen.add(name)
+        out.push({ name, category: p.category, price: p.price })
+      }
+      if (out.length >= 6) break
+    }
+    return out
+  }, [query, catalogProducts])
+
+  const [highlightIdx, setHighlightIdx] = useState(-1)
+
+  useEffect(() => {
+    setHighlightIdx(-1)
+  }, [query])
 
   useEffect(() => {
     const onClick = (e) => {
@@ -91,6 +116,14 @@ export function Header() {
       ? `?g=${groupParam}&i=${encodeURIComponent(r.item.name)}`
       : `?g=${groupParam}`
     navigate(`/category/${categorySlug(r.menu.category)}${params}`)
+  }
+
+  const goToSearch = () => {
+    const q = query.trim()
+    if (!q) return
+    setOpen(false)
+    setQuery('')
+    navigate(`/search?q=${encodeURIComponent(q)}`)
   }
 
   // Best match for Enter/Search button: category > subcategory > product
@@ -146,7 +179,23 @@ export function Header() {
               }}
               onFocus={() => setOpen(true)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && firstResult) runFirstResult()
+                const suggestions = autocompleteSuggestions
+                if (suggestions.length > 0 && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                  e.preventDefault()
+                  setHighlightIdx((prev) => {
+                    if (e.key === 'ArrowDown') return prev < suggestions.length - 1 ? prev + 1 : 0
+                    return prev > 0 ? prev - 1 : suggestions.length - 1
+                  })
+                  return
+                }
+                if (e.key === 'Enter') {
+                  if (highlightIdx >= 0 && suggestions[highlightIdx]) {
+                    setQuery(suggestions[highlightIdx].name)
+                    setHighlightIdx(-1)
+                  } else if (firstResult) {
+                    runFirstResult()
+                  }
+                }
               }}
             />
             <button type="button" onClick={runFirstResult}>Search</button>
@@ -178,7 +227,30 @@ export function Header() {
               </div>
             )}
 
-            {open && query.trim() && (
+            {open && query.trim() && autocompleteSuggestions.length > 0 && (
+              <div className="autocomplete-dropdown">
+                {autocompleteSuggestions.map((s, idx) => (
+                  <button
+                    key={s.name}
+                    type="button"
+                    className={`autocomplete-item ${idx === highlightIdx ? 'highlighted' : ''}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setQuery(s.name)
+                      setHighlightIdx(-1)
+                    }}
+                  >
+                    <span className="autocomplete-name">{highlightMatch(s.name)}</span>
+                    <span className="autocomplete-meta">{s.category} · {s.price}</span>
+                  </button>
+                ))}
+                <button type="button" className="search-view-all" onClick={goToSearch}>
+                  View all results for &ldquo;{query.trim()}&rdquo;
+                </button>
+              </div>
+            )}
+
+            {open && query.trim() && autocompleteSuggestions.length === 0 && (
               <div className="search-dropdown">
                 {categoryResults.length === 0 && subcategoryResults.length === 0 && productResults.length === 0 ? (
                   <p className="search-empty">No matches found</p>
@@ -227,6 +299,9 @@ export function Header() {
                             <em>{p.price}</em>
                           </button>
                         ))}
+                        <button type="button" className="search-view-all" onClick={goToSearch}>
+                          View all results for &ldquo;{query.trim()}&rdquo;
+                        </button>
                       </>
                     )}
                   </>

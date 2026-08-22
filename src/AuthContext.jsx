@@ -91,8 +91,37 @@ export function AuthProvider({ children }) {
     return data.error ?? 'Something went wrong'
   }
 
+  const forgotPassword = async (email) => {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) return null
+    return data.error ?? 'Something went wrong'
+  }
+
+  const resetPassword = async (token, password) => {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) return null
+    return data.error ?? 'Something went wrong'
+  }
+
+  const resendVerification = async () => {
+    const res = await fetch('/api/auth/verify/resend', { method: 'POST' })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) return null
+    return data.error ?? 'Something went wrong'
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, setUsername, setPhone, setName }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, setUsername, setPhone, setName, forgotPassword, resetPassword, resendVerification }}>
       {children}
     </AuthContext.Provider>
   )

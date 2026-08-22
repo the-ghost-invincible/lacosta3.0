@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useAuth } from './AuthContext'
+import { parsePrice } from './utils'
 
 const CartContext = createContext(null)
 const STORAGE_KEY = 'lacosta-cart'
@@ -11,9 +12,6 @@ const loadCart = () => {
     return []
   }
 }
-
-// Prices are display strings like "KSh 1,200,000" — reduce to a number
-const parsePrice = (price) => Number(String(price ?? '').replace(/[^\d]/g, '')) || 0
 
 export function CartProvider({ children }) {
   const { user, loading } = useAuth()

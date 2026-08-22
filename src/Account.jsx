@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from './Header'
 import { useAuth } from './AuthContext'
 import './App.css'
 
 export function AccountPage() {
-  const { user, loading, logout } = useAuth()
+  const { user, loading, logout, resendVerification } = useAuth()
   const navigate = useNavigate()
+  const [verifyMsg, setVerifyMsg] = useState(null)
+  const [verifyBusy, setVerifyBusy] = useState(false)
 
   if (loading) {
     return (
@@ -50,6 +53,29 @@ export function AccountPage() {
         </section>
 
         <div className="account-card">
+          {user.verified === false && (
+            <div className="verify-banner">
+              <p>Please verify your email address.</p>
+              {verifyMsg ? (
+                <span>{verifyMsg}</span>
+              ) : (
+                <button
+                  type="button"
+                  className="text-btn"
+                  disabled={verifyBusy}
+                  onClick={async () => {
+                    setVerifyBusy(true)
+                    const err = await resendVerification()
+                    setVerifyBusy(false)
+                    setVerifyMsg(err ? err : 'Verification email sent! Check your inbox.')
+                  }}
+                >
+                  {verifyBusy ? 'Sending…' : 'Resend verification email'}
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="account-profile">
             {user.avatar && <img src={user.avatar} alt="" />}
             <div>
