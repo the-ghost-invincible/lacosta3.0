@@ -186,20 +186,15 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
           <small>Manage your store</small>
         </div>
         <div className="admin-bar-actions">
-          {ngrokUrl && (
-            <button
-              type="button"
-              className="btn ghost small ngrok-badge"
-              title="Share this link with customers"
-              onClick={() => {
-                navigator.clipboard?.writeText(ngrokUrl)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 1500)
-              }}
-            >
-              {copied ? 'Copied ✓' : '🔗 ' + ngrokUrl.replace('https://', '')}
-            </button>
-          )}
+          <a
+            href="https://lacostamarkets.site"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn ghost small ngrok-badge"
+            title="Open your store"
+          >
+            <span className="site-logo">L</span> lacostamarkets.site
+          </a>
           <button
             type="button"
             className="btn ghost small"

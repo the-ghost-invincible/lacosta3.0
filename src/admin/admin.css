@@ -72,6 +72,23 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.site-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #a3e635, #65a30d);
+  color: white;
+  font-weight: 900;
+  font-size: 0.75rem;
+  flex-shrink: 0;
 }
 
 .admin-tabs {
