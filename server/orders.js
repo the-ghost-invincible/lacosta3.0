@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { pool } from './db.js'
 import { userFromSession } from './auth.js'
 import { sendEmail } from './email.js'
+import { config } from './config.js'
 
 const STATUSES = ['pending', 'confirmed', 'canceled', 'delivered']
 
@@ -69,6 +70,34 @@ orderRouter.post('/', requireUser, async (req, res) => {
       </div>
     `,
   }).catch(() => {})
+
+  // Send notification to admin
+  if (config.adminEmail) {
+    sendEmail({
+      to: config.adminEmail,
+      subject: `🛒 New Order #${order.id} — KSh ${total.toLocaleString()}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+          <h2 style="color:#65a30d">New order received!</h2>
+          <p><strong>Order #${order.id}</strong></p>
+          <p><strong>Customer:</strong> ${name} (${req.user.email})</p>
+          <p><strong>Phone:</strong> ${phone}</p>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0">
+            <thead>
+              <tr style="background:#f5f5f5">
+                <th style="padding:8px;text-align:left">Item</th>
+                <th style="padding:8px;text-align:center">Qty</th>
+                <th style="padding:8px;text-align:right">Price</th>
+              </tr>
+            </thead>
+            <tbody>${itemsList}</tbody>
+          </table>
+          <p style="font-size:18px"><strong>Total: ${order.total}</strong></p>
+          <p><a href="${config.baseUrl}" style="color:#65a30d">View in admin panel →</a></p>
+        </div>
+      `,
+    }).catch(() => {})
+  }
 
   res.json({ ok: true, order })
 })

@@ -9,5 +9,6 @@ export const config = {
   adminPath: process.env.ADMIN_PATH ?? '/admin-7f3k9',
   resendApiKey: process.env.RESEND_API_KEY ?? '',
   emailFrom: process.env.EMAIL_FROM ?? 'Lacosta <noreply@localhost>',
+  adminEmail: process.env.ADMIN_EMAIL ?? '',
   baseUrl: process.env.BASE_URL ?? 'http://localhost:4000',
 }
