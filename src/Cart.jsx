@@ -269,8 +269,7 @@ export function CartPage() {
               <button type="button" className="primary-btn cart-place-order-btn" onClick={placeOrder}>Place order</button>
               <button
                 type="button"
-                className={`secondary-btn cart-checkout-btn ${orderPlaced ? 'glow' : ''}`}
-                onClick={checkout}
+                className="secondary-btn cart-checkout-btn glow"
               >Proceed to checkout</button>
               <button type="button" className="secondary-btn cart-clear-btn" onClick={clearCart}>
                 Clear cart
