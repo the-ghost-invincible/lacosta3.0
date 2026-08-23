@@ -1,19 +1,13 @@
 #!/bin/bash
 # ============================================================
-# Lacosta — Production Deployment Script for Nescom VPS
+# Lacosta — Production Deployment Script
 # ============================================================
 # Usage:
-#   1. Upload this project to your VPS (or git clone)
-#   2. Run: chmod +x deploy/deploy.sh
-#   3. Run: ./deploy/deploy.sh your-domain.com your@email.com
-#
-# Example:
-#   ./deploy/deploy.sh lacosta.co.ke admin@lacosta.co.ke
+#   sudo ./deploy/deploy.sh your-domain.com admin@email.com
 # ============================================================
 
 set -euo pipefail
 
-# ---- Config (override via args) ----
 DOMAIN="${1:?Usage: $0 <domain> <email>}"
 ADMIN_EMAIL="${2:?Usage: $0 <domain> <email>}"
 APP_DIR="/var/www/lacosta"
@@ -33,9 +27,8 @@ log()  { echo -e "${GREEN}[✓]${NC} $1"; }
 warn() { echo -e "${YELLOW}[!]${NC} $1"; }
 err()  { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 
-# ---- Preflight checks ----
 if [[ $EUID -ne 0 ]]; then
-  err "Run this script as root: sudo ./deploy/deploy.sh $DOMAIN $ADMIN_EMAIL"
+  err "Run as root: sudo ./deploy/deploy.sh $DOMAIN $ADMIN_EMAIL"
 fi
 
 echo ""
@@ -119,11 +112,9 @@ log "Deploying application to $APP_DIR..."
 mkdir -p "$APP_DIR"
 mkdir -p "$APP_DIR/logs"
 
-# Copy files (assuming script is run from project root)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# If running from project root, copy everything
 if [[ -f "$PROJECT_DIR/package.json" ]]; then
   rsync -a --exclude='node_modules' --exclude='.git' --exclude='dist' "$PROJECT_DIR/" "$APP_DIR/"
 else
@@ -137,30 +128,19 @@ cd "$APP_DIR"
 # ============================================================
 log "Creating .env file..."
 cat > .env <<ENVEOF
-# Database
 DATABASE_URL=postgres://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME
-
-# Admin
 ADMIN_PASSWORD=$ADMIN_PASS
 ADMIN_PATH=/admin-$ADMIN_SECRET
 PORT=4000
-
-# Domain
 BASE_URL=https://$DOMAIN
-
-# Email (Resend)
 RESEND_API_KEY=
 EMAIL_FROM=Lacosta <noreply@$DOMAIN>
-
-# M-Pesa (add later)
 MPESA_CONSUMER_KEY=
 MPESA_CONSUMER_SECRET=
 MPESA_SHORTCODE=
 MPESA_PASSKEY=
 MPESA_CALLBACK_URL=https://$DOMAIN/api/payments/mpesa/callback
 DARAJA_BASE_URL=https://api.safaricom.co.ke
-
-# Error tracking (optional)
 SENTRY_DSN=
 ENVEOF
 
@@ -186,75 +166,22 @@ pm2 save
 pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
 
 # ============================================================
-# 11. CONFIGURE NGINX
+# 11. NGINX — HTTP-only first (so nginx can start without SSL certs)
 # ============================================================
-log "Configuring Nginx..."
+log "Configuring Nginx (HTTP)..."
 
-# Generate nginx config from template
 cat > /etc/nginx/sites-available/lacosta <<NGINXEOF
 # Rate limiting zone
 limit_req_zone \$binary_remote_addr zone=api:10m rate=10r/s;
 
-# HTTP → HTTPS redirect
+# HTTP server (temporary — certbot will add HTTPS)
 server {
     listen 80;
     listen [::]:80;
     server_name $DOMAIN www.$DOMAIN;
 
-    # Certbot ACME challenge
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
-    }
-
-    location / {
-        return 301 https://\$host\$request_uri;
-    }
-}
-
-# HTTPS server
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name $DOMAIN www.$DOMAIN;
-
-    # SSL (will be configured by certbot)
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
-
-    # SSL settings
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers on;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
-
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-
-    # Gzip
-    gzip on;
-    gzip_vary on;
-    gzip_proxied any;
-    gzip_comp_level 6;
-    gzip_min_length 256;
-    gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/atom+xml image/svg+xml;
-
-    # Static assets (cached forever)
-    location /assets/ {
-        alias $APP_DIR/dist/assets/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-
-    # Uploaded images
-    location /uploads/ {
-        alias $APP_DIR/public/uploads/;
-        expires 30d;
-        add_header Cache-Control "public";
     }
 
     # API with rate limiting
@@ -280,40 +207,140 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
-    # Block hidden files
     location ~ /\\. {
         deny all;
     }
 }
 NGINXEOF
 
-# Remove default site and enable lacosta
 rm -f /etc/nginx/sites-enabled/default
 ln -sf /etc/nginx/sites-available/lacosta /etc/nginx/sites-enabled/
 
-# Test nginx config
-nginx -t 2>/dev/null || { err "Nginx config test failed. Check /etc/nginx/sites-available/lacosta"; }
-systemctl reload nginx 2>/dev/null || systemctl start nginx
+nginx -t || err "Nginx config test failed"
+systemctl reload nginx
 
 # ============================================================
 # 12. SSL WITH CERTBOT
 # ============================================================
-log "Installing Certbot and obtaining SSL certificate..."
+log "Installing Certbot..."
 apt install -y -qq certbot python3-certbot-nginx
 
-# First get cert with standalone (before nginx uses the domain)
+log "Obtaining SSL certificate..."
 systemctl stop nginx 2>/dev/null || true
-certbot certonly --standalone -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos -m "$ADMIN_EMAIL" --redirect || {
-  warn "SSL cert request failed — will retry after DNS propagation"
-  warn "Run: certbot --nginx -d $DOMAIN -d www.$DOMAIN"
+certbot certonly --standalone -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos -m "$ADMIN_EMAIL" || {
+  warn "SSL cert request failed — DNS may not have propagated yet."
+  warn "After DNS points here, run: certbot certonly --standalone -d $DOMAIN -d www.$DOMAIN"
+  warn "Then re-run this script, or run: certbot --nginx -d $DOMAIN -d www.$DOMAIN"
+  systemctl start nginx
+  echo ""
+  echo "╔══════════════════════════════════════════╗"
+  echo "║  Partial deploy — SSL not configured     ║"
+  echo "╚══════════════════════════════════════════╝"
+  echo ""
+  echo "  Site is running on HTTP only."
+  echo "  Fix DNS, then run:"
+  echo "    certbot --nginx -d $DOMAIN -d www.$DOMAIN"
+  echo ""
+  echo "  Admin password: $ADMIN_PASS"
+  echo "  Admin path:     /admin-$ADMIN_SECRET"
+  echo "  Database pass:  $DB_PASS"
+  echo ""
+  exit 0
 }
 systemctl start nginx
 
-# Enable HTTPS in nginx
-certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos -m "$ADMIN_EMAIL" --redirect 2>/dev/null || true
+# ============================================================
+# 13. FULL HTTPS NGINX CONFIG
+# ============================================================
+log "Applying HTTPS Nginx config..."
+
+cat > /etc/nginx/sites-available/lacosta <<NGINXEOF
+limit_req_zone \$binary_remote_addr zone=api:10m rate=10r/s;
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $DOMAIN www.$DOMAIN;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name $DOMAIN www.$DOMAIN;
+
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_min_length 256;
+    gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/atom+xml image/svg+xml;
+
+    location /assets/ {
+        alias $APP_DIR/dist/assets/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location /uploads/ {
+        alias $APP_DIR/public/uploads/;
+        expires 30d;
+        add_header Cache-Control "public";
+    }
+
+    location /api/ {
+        limit_req zone=api burst=20 nodelay;
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 60s;
+        proxy_connect_timeout 60s;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location ~ /\\. {
+        deny all;
+    }
+}
+NGINXEOF
+
+nginx -t && systemctl reload nginx
 
 # ============================================================
-# 13. AUTO-RENEW SSL
+# 14. AUTO-RENEW SSL
 # ============================================================
 echo "0 0 1 * * root certbot renew --quiet --post-hook 'systemctl reload nginx'" > /etc/cron.d/certbot-renew
 

@@ -1,3 +1,5 @@
+import crypto from 'node:crypto'
+
 const SENTRY_DSN = process.env.SENTRY_DSN ?? ''
 
 // Lightweight error reporter — works with or without Sentry DSN
