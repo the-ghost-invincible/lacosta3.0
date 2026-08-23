@@ -79,8 +79,9 @@ pm2 startup
 
 # Setup Nginx
 cp deploy/nginx.conf /etc/nginx/sites-available/lacosta
-# Replace app directory in nginx config
-sed -i "s|/home/sadamjr/Desktop/lacosta\\\\ 3.0|$APP_DIR|g" /etc/nginx/sites-available/lacosta
+# Replace placeholders with actual values
+sed -i "s|DOMAIN_PLACEHOLDER|$DOMAIN|g" /etc/nginx/sites-available/lacosta
+sed -i "s|/var/www/lacosta|$APP_DIR|g" /etc/nginx/sites-available/lacosta
 
 ln -sf /etc/nginx/sites-available/lacosta /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default

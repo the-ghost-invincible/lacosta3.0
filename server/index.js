@@ -108,9 +108,11 @@ async function writeSection(section, value) {
 }
 
 async function writeProduct(product) {
+  const client = await pool.connect()
   try {
+    await client.query('BEGIN')
     if (product.id) {
-      await pool.query(
+      await client.query(
         `UPDATE products SET name = $1, category = $2, brand = $3, subcategory = $4,
          price = $5, old_price = $6, seller = $7, rating = $8, image = $9,
          description = $10, specs = $11, badge = $12, out_of_stock = $13, updated_at = now()
@@ -121,23 +123,26 @@ async function writeProduct(product) {
          product.badge ?? null, product.outOfStock ?? false, product.id]
       )
     } else {
-      const maxResult = await pool.query('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM products')
-      const newId = maxResult.rows[0].next_id
-      await pool.query(
-        `INSERT INTO products (id, name, category, brand, subcategory, price, old_price, seller, rating, image, description, specs, badge, out_of_stock)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-        [newId, product.name, product.category, product.brand ?? null, product.subcategory ?? null,
+      const result = await client.query(
+        `INSERT INTO products (name, category, brand, subcategory, price, old_price, seller, rating, image, description, specs, badge, out_of_stock)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         RETURNING id`,
+        [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
          product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
          product.image ?? null, product.description ?? null, JSON.stringify(product.specs ?? []),
          product.badge ?? null, product.outOfStock ?? false]
       )
-      product.id = newId
+      product.id = result.rows[0].id
     }
+    await client.query('COMMIT')
     siteDataCache = null
     return product
   } catch (err) {
+    await client.query('ROLLBACK')
     console.error('Product write failed:', err.message)
     throw err
+  } finally {
+    client.release()
   }
 }
 

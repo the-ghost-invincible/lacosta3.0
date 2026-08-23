@@ -287,9 +287,13 @@ server {
 }
 NGINXEOF
 
-# Remove default site
+# Remove default site and enable lacosta
 rm -f /etc/nginx/sites-enabled/default
 ln -sf /etc/nginx/sites-available/lacosta /etc/nginx/sites-enabled/
+
+# Test nginx config
+nginx -t 2>/dev/null || { err "Nginx config test failed. Check /etc/nginx/sites-available/lacosta"; }
+systemctl reload nginx 2>/dev/null || systemctl start nginx
 
 # ============================================================
 # 12. SSL WITH CERTBOT
