@@ -2098,13 +2098,9 @@
 
 .cart-item-description {
   margin: 4px 0 0;
-  font-size: 0.72rem;
-  color: var(--text-faint);
+  font-size: 0.75rem;
+  color: var(--text-muted);
   line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .cart-item-specs {
