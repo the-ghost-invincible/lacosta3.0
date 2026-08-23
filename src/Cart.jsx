@@ -153,7 +153,7 @@ export function CartPage() {
 
         {orderPlaced && paymentMethod === 'cod' && (
           <p className="order-success">
-            Order placed! We&apos;ll call <strong>{user.phone}</strong> to confirm your delivery{user.displayName ? `, ${user.displayName}` : ''}. Your cart is kept until you check out.
+            Order placed! Your order will be confirmed by a call to <strong>{user.phone}</strong>. Please keep your phone nearby{user.displayName ? `, ${user.displayName}` : ''}. Your cart is kept until you check out.
           </p>
         )}
         {orderPlaced && paymentMethod === 'mpesa' && mpesaStatus === 'paid' && (
@@ -270,6 +270,7 @@ export function CartPage() {
               <button
                 type="button"
                 className="secondary-btn cart-checkout-btn glow"
+                onClick={placeOrder}
               >Proceed to checkout</button>
               <button type="button" className="secondary-btn cart-clear-btn" onClick={clearCart}>
                 Clear cart
