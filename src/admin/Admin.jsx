@@ -635,6 +635,7 @@ function OrdersTab() {
   const [orders, setOrders] = useState([])
   const [busyId, setBusyId] = useState(null)
   const [selected, setSelected] = useState([])
+  const [viewOrder, setViewOrder] = useState(null)
 
   const load = () => {
     api('/api/admin/orders')
@@ -664,7 +665,10 @@ function OrdersTab() {
     setBusyId(id)
     const res = await api(`/api/admin/orders/${id}`, { method: 'DELETE' })
     setBusyId(null)
-    if (res.ok) load()
+    if (res.ok) {
+      if (viewOrder?.id === id) setViewOrder(null)
+      load()
+    }
   }
 
   const toggle = (id) =>
@@ -790,6 +794,13 @@ function OrdersTab() {
                     </span>
                   </td>
                   <td className="nowrap">
+                    <button
+                      type="button"
+                      className="btn ghost small"
+                      onClick={() => setViewOrder(order)}
+                    >
+                      View
+                    </button>{' '}
                     {order.status === 'pending' && (
                       <>
                         <button
@@ -844,6 +855,63 @@ function OrdersTab() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {viewOrder && (
+        <div className="admin-modal-overlay" onClick={() => setViewOrder(null)}>
+          <div className="admin-modal order-detail-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="order-detail-head">
+              <div>
+                <h2>Order #{viewOrder.id}</h2>
+                <p className="muted">{fmtTime(viewOrder.created_at)}</p>
+              </div>
+              <span className={`status-badge status-${viewOrder.status}`}>
+                {STATUS_LABELS[viewOrder.status] ?? viewOrder.status}
+              </span>
+            </div>
+
+            <div className="order-detail-customer">
+              <h3>Customer</h3>
+              <p><strong>{viewOrder.name}</strong></p>
+              <p className="muted">{viewOrder.phone}</p>
+              <p className="muted">{viewOrder.email}</p>
+            </div>
+
+            <div className="order-detail-items">
+              <h3>Items</h3>
+              {(viewOrder.items ?? []).map((item, idx) => (
+                <div key={idx} className="order-detail-item">
+                  {item.image && <img src={item.image} alt={item.name} className="order-detail-img" />}
+                  <div className="order-detail-item-info">
+                    <strong>{item.name}</strong>
+                    {item.brand && <div className="muted">{item.brand}{item.subcategory ? ` · ${item.subcategory}` : ''}</div>}
+                    {item.description && <p className="order-detail-desc">{item.description}</p>}
+                    {Array.isArray(item.specs) && item.specs.length > 0 && (
+                      <div className="order-detail-specs">
+                        {item.specs.map((spec) => (
+                          <span key={spec} className="order-detail-spec">{spec}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="order-detail-item-right">
+                    <span className="muted">× {item.qty ?? 1}</span>
+                    <strong>{item.price}</strong>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="order-detail-total">
+              <span>Total</span>
+              <strong>{viewOrder.total}</strong>
+            </div>
+
+            <div className="form-actions">
+              <button type="button" className="btn ghost" onClick={() => setViewOrder(null)}>Close</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -80,7 +80,13 @@ export function CartProvider({ children }) {
       price: product.price,
       image: product.image,
       category: product.category,
-      seller: product.seller
+      seller: product.seller,
+      description: product.description ?? '',
+      specs: product.specs ?? [],
+      brand: product.brand ?? '',
+      oldPrice: product.oldPrice ?? '',
+      subcategory: product.subcategory ?? '',
+      rating: product.rating,
     }
     setItems((prev) => {
       const existing = prev.find((i) => i.id === product.id)

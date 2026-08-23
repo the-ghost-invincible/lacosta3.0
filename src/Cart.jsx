@@ -196,6 +196,15 @@ export function CartPage() {
                   <div className="cart-item-info">
                     <span className="product-category">{item.category}</span>
                     <h3>{item.name}</h3>
+                    {item.brand && <small className="cart-item-brand">{item.brand}{item.subcategory ? ` · ${item.subcategory}` : ''}</small>}
+                    {item.description && <p className="cart-item-description">{item.description}</p>}
+                    {Array.isArray(item.specs) && item.specs.length > 0 && (
+                      <div className="cart-item-specs">
+                        {item.specs.map((spec) => (
+                          <span key={spec} className="cart-item-spec">{spec}</span>
+                        ))}
+                      </div>
+                    )}
                     <small>{item.seller}</small>
                     <div className="cart-item-controls">
                       <button type="button" onClick={() => updateQty(item.id, -1)}>−</button>

@@ -458,3 +458,134 @@
   color: #dc2626;
   font-size: 0.85rem;
 }
+
+.order-detail-modal {
+  max-width: 560px;
+}
+
+.order-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--adm-line);
+}
+
+.order-detail-head h2 {
+  margin: 0;
+}
+
+.order-detail-customer {
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--adm-line);
+}
+
+.order-detail-customer h3 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--adm-muted);
+  margin: 0 0 0.4rem;
+}
+
+.order-detail-customer p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--adm-text);
+}
+
+.order-detail-items {
+  margin-bottom: 1rem;
+}
+
+.order-detail-items h3 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--adm-muted);
+  margin: 0 0 0.6rem;
+}
+
+.order-detail-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--adm-line);
+  align-items: flex-start;
+}
+
+.order-detail-item:last-child {
+  border-bottom: none;
+}
+
+.order-detail-img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.order-detail-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.order-detail-item-info strong {
+  display: block;
+  font-size: 0.88rem;
+  color: var(--adm-strong);
+}
+
+.order-detail-desc {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: var(--adm-muted);
+  line-height: 1.4;
+}
+
+.order-detail-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.order-detail-spec {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  background: var(--adm-ghost);
+  border-radius: 4px;
+  color: var(--adm-soft);
+}
+
+.order-detail-item-right {
+  text-align: right;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.order-detail-item-right strong {
+  font-size: 0.85rem;
+  color: var(--adm-strong);
+}
+
+.order-detail-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-top: 2px solid var(--adm-border);
+  font-size: 1rem;
+  color: var(--adm-strong);
+}
+
+.order-detail-total strong {
+  font-size: 1.1rem;
+}
