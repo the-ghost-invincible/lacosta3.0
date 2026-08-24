@@ -12,6 +12,7 @@ import { VerifyEmail } from './VerifyEmail'
 import { CartProvider } from './CartContext'
 import { AuthProvider } from './AuthContext'
 import { UsernameSetup } from './UsernameSetup'
+import { HistoryPage } from './History'
 import { PrivacyPolicy, TermsOfService, RefundPolicy } from './Legal'
 import './App.css'
 
@@ -25,6 +26,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/category/:categorySlug" element={<CategoryPage />} />
             <Route path="/cart" element={<CartPage />} />
+            <Route path="/history" element={<HistoryPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/search" element={<SearchResults />} />

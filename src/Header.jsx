@@ -339,6 +339,9 @@ export function Header() {
               🛒 <span>Cart</span>
               {count > 0 && <em className="cart-badge">{count}</em>}
             </button>
+            <button type="button" className="cart-pill" aria-label="Purchase history" onClick={() => navigate('/history')} style={{ cursor: 'pointer' }}>
+              📋 <span>History</span>
+            </button>
           </nav>
         </div>
       </header>
@@ -487,6 +490,10 @@ function MobileNav({ theme, onToggleTheme, onAccountClick }) {
             {count > 0 && <em className="cart-badge">{count}</em>}
           </span>
           Cart
+        </button>
+        <button type="button" onClick={() => navigate('/history')} className={pathname === '/history' ? 'active' : ''}>
+          <span className="nav-icon">📋</span>
+          History
         </button>
         <button type="button" onClick={onToggleTheme} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
           <span className="nav-icon">{theme === 'dark' ? '☀️' : '🌙'}</span>

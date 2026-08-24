@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { Header } from './Header'
 import { useCart } from './CartContext'
-import { useAuth } from './AuthContext'
 import './App.css'
 
 const prefixOf = (price) => {
@@ -12,130 +11,36 @@ const prefixOf = (price) => {
 
 const formatMoney = (n, prefix = "KSh") => `${prefix} ${n.toLocaleString()}`
 
+const HISTORY_KEY = 'lacosta_history'
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) ?? [] } catch { return [] }
+}
+
+function saveToHistory(items, total, currency) {
+  const history = loadHistory()
+  history.unshift({
+    id: Date.now(),
+    date: new Date().toISOString(),
+    items: items.map((i) => ({ ...i })),
+    total: formatMoney(total, currency),
+  })
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
+}
+
 export function CartPage() {
   const { items, updateQty, removeFromCart, clearCart, total, parsePrice } = useCart()
-  const { user, setPhone, setName } = useAuth()
   const navigate = useNavigate()
-  const [phoneOpen, setPhoneOpen] = useState(false)
-  const [name, setNameValue] = useState('')
-  const [phone, setPhoneValue] = useState('')
-  const [nameError, setNameError] = useState(null)
-  const [phoneError, setPhoneError] = useState(null)
-  const [phoneBusy, setPhoneBusy] = useState(false)
-  const [orderPlaced, setOrderPlaced] = useState(false)
-  const [orderId, setOrderId] = useState(null)
-  const [paymentMethod, setPaymentMethod] = useState('mpesa') // 'mpesa' or 'cod'
-  const [mpesaBusy, setMpesaBusy] = useState(false)
-  const [mpesaError, setMpesaError] = useState(null)
-  const [mpesaStatus, setMpesaStatus] = useState(null) // null, 'pending', 'paid', 'failed'
-  const [mpesaReceipt, setMpesaReceipt] = useState(null)
-  const [checkedOut, setCheckedOut] = useState(false)
   const [expandedId, setExpandedId] = useState(null)
+  const [checkedOut, setCheckedOut] = useState(false)
   const currency = items.find((i) => /[^\d]/.test(String(i.price ?? '')))
     ? prefixOf(items[0].price)
     : "KSh"
 
-  const placeOrder = () => {
-    setOrderPlaced(false)
-    if (!user) {
-      navigate('/login')
-      return
-    }
-    setNameValue(user.displayName ?? '')
-    setPhoneValue(user.phone ?? '')
-    setNameError(null)
-    setPhoneError(null)
-    setPhoneOpen(true)
-  }
-
-  const submitOrder = async (e) => {
-    e.preventDefault()
-    setPhoneBusy(true)
-    setNameError(null)
-    setPhoneError(null)
-    const nameErr = await setName(name)
-    const phoneErr = await setPhone(phone)
-    if (nameErr) setNameError(nameErr)
-    if (phoneErr) setPhoneError(phoneErr)
-    if (nameErr || phoneErr) {
-      setPhoneBusy(false)
-      return
-    }
-    const res = await fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, phone, items }),
-    })
-    setPhoneBusy(false)
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      setPhoneError(data.error ?? 'Could not place the order — try again')
-      return
-    }
-    const data = await res.json().catch(() => ({}))
-    setPhoneOpen(false)
-    setOrderId(data.order?.id ?? null)
-    setOrderPlaced(true)
-    clearCart()
-
-    // Auto-initiate M-Pesa if selected
-    if (paymentMethod === 'mpesa' && data.order?.id) {
-      initiateMpesa(data.order.id)
-    }
-  }
-
-  const initiateMpesa = async (oid) => {
-    setMpesaBusy(true)
-    setMpesaError(null)
-    setMpesaStatus('pending')
-    try {
-      const res = await fetch('/api/payments/mpesa/stkpush', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: oid, phone: phone || user?.phone }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setMpesaError(data.error ?? 'M-Pesa payment failed')
-        setMpesaStatus(null)
-      } else {
-        // Poll for status
-        pollPaymentStatus(data.checkoutRequestId)
-      }
-    } catch {
-      setMpesaError('Network error — try again')
-      setMpesaStatus(null)
-    }
-    setMpesaBusy(false)
-  }
-
-  const pollPaymentStatus = async (checkoutRequestId) => {
-    for (let i = 0; i < 30; i++) {
-      await new Promise((r) => setTimeout(r, 3000))
-      try {
-        const res = await fetch(`/api/payments/status/${checkoutRequestId}`)
-        const data = await res.json().catch(() => ({}))
-        if (data.ResponseCode === '0') {
-          setMpesaStatus('paid')
-          setMpesaReceipt(data.MpesaReceiptNumber ?? 'N/A')
-          return
-        }
-        if (data.ResponseCode && data.ResponseCode !== '1032') {
-          setMpesaStatus('failed')
-          setMpesaError(data.ResultDesc ?? 'Payment failed')
-          return
-        }
-      } catch {
-        // keep polling
-      }
-    }
-    setMpesaStatus('failed')
-    setMpesaError('Payment timed out — check your M-Pesa messages')
-  }
-
   const checkout = () => {
     if (!items.length) return
-    if (!confirm('Complete checkout? Your cart will be emptied.')) return
+    if (!confirm('Save these items to your purchase history and clear the cart?')) return
+    saveToHistory(items, total, currency)
     clearCart()
     setCheckedOut(true)
   }
@@ -152,32 +57,13 @@ export function CartPage() {
           </div>
         </section>
 
-        {orderPlaced && paymentMethod === 'cod' && (
-          <p className="order-success">
-            Order placed! Your order will be confirmed by a call to <strong>{user.phone}</strong>. Please keep your phone nearby{user.displayName ? `, ${user.displayName}` : ''}. Your cart is kept until you check out.
-          </p>
-        )}
-        {orderPlaced && paymentMethod === 'mpesa' && mpesaStatus === 'paid' && (
-          <p className="order-success">
-            Payment confirmed! M-Pesa receipt: <strong>{mpesaReceipt}</strong>. Your order is being processed.
-          </p>
-        )}
-        {orderPlaced && paymentMethod === 'mpesa' && mpesaStatus === 'pending' && (
-          <p className="order-success" style={{ background: '#fffbeb', borderColor: '#f59e0b' }}>
-            Check your phone for the M-Pesa prompt. Enter your PIN to complete payment.
-          </p>
-        )}
-        {orderPlaced && paymentMethod === 'mpesa' && mpesaStatus === 'failed' && (
-          <div className="order-success" style={{ background: '#fef2f2', borderColor: '#ef4444' }}>
-            <p>Payment failed: {mpesaError}</p>
-            <p>Your order is saved. You can try paying again or pay on delivery.</p>
-            <button type="button" className="primary-btn" onClick={() => initiateMpesa(orderId)} disabled={mpesaBusy}>
-              {mpesaBusy ? 'Retrying...' : 'Retry M-Pesa payment'}
-            </button>
-          </div>
-        )}
         {checkedOut && (
-          <p className="order-success">Checkout complete! Your cart has been cleared.</p>
+          <p className="order-success">
+            Items saved to your <strong>purchase history</strong>! Your cart has been cleared.{' '}
+            <button type="button" className="text-btn" onClick={() => navigate('/history')} style={{ textDecoration: 'underline' }}>
+              View history
+            </button>
+          </p>
         )}
 
         {items.length === 0 ? (
@@ -267,12 +153,9 @@ export function CartPage() {
                 <span>Total</span>
                 <span>{formatMoney(total, currency)}</span>
               </div>
-              <button type="button" className="primary-btn cart-place-order-btn" onClick={placeOrder}>Place order</button>
-              <button
-                type="button"
-                className="secondary-btn cart-checkout-btn glow"
-                onClick={placeOrder}
-              >Proceed to checkout</button>
+              <button type="button" className="primary-btn cart-place-order-btn glow" onClick={checkout}>
+                Checkout
+              </button>
               <button type="button" className="secondary-btn cart-clear-btn" onClick={clearCart}>
                 Clear cart
               </button>
@@ -280,62 +163,6 @@ export function CartPage() {
           </div>
         )}
       </main>
-
-      {phoneOpen && (
-        <div className="order-overlay" onClick={() => setPhoneOpen(false)}>
-          <form
-            className="order-card"
-            onSubmit={submitOrder}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2>Confirm your order</h2>
-            <p>Enter your name and phone number so we can confirm your delivery.</p>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setNameValue(e.target.value)}
-              placeholder="Your name"
-              autoFocus
-            />
-            {nameError && <p className="error">{nameError}</p>}
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhoneValue(e.target.value)}
-              placeholder="e.g. 0712 345 678"
-            />
-            {phoneError && <p className="error">{phoneError}</p>}
-
-            <div style={{ margin: '1rem 0' }}>
-              <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Payment method</p>
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                  <input type="radio" name="payment" value="mpesa" checked={paymentMethod === 'mpesa'} onChange={() => setPaymentMethod('mpesa')} />
-                  M-Pesa
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                  <input type="radio" name="payment" value="cod" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} />
-                  Pay on delivery
-                </label>
-              </div>
-            </div>
-
-            {paymentMethod === 'mpesa' && (
-              <p style={{ fontSize: '0.85rem', color: 'var(--muted, #666)', marginBottom: '1rem' }}>
-                You&apos;ll receive an M-Pesa STK prompt on your phone to complete payment.
-              </p>
-            )}
-
-            {mpesaError && <p className="error">{mpesaError}</p>}
-            <button type="submit" className="primary-btn" disabled={phoneBusy || mpesaBusy}>
-              {phoneBusy ? 'Placing…' : mpesaBusy ? 'Processing payment…' : paymentMethod === 'mpesa' ? 'Pay with M-Pesa' : 'Place order'}
-            </button>
-            <button type="button" className="text-btn" onClick={() => setPhoneOpen(false)}>
-              Cancel
-            </button>
-          </form>
-        </div>
-      )}
     </div>
   )
 }
