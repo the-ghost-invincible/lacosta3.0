@@ -324,6 +324,7 @@ function emptyProduct() {
     description: '',
     specs: [],
     outOfStock: false,
+    quantity: 0,
   }
 }
 
@@ -396,6 +397,13 @@ function ProductForm({ initial, categories, onSave, onCancel }) {
           <label>Specs (comma separated)</label>
           <input value={(product.specs ?? []).join(', ')} onChange={(e) => set('specs', e.target.value.split(',').map((s) => s.trim()))} placeholder="330ml bottle, Carbonated, …" />
         </div>
+        <div className="form-field">
+          <label>Quantity in stock</label>
+          <input type="number" min="0" value={product.quantity ?? 0} onChange={(e) => set('quantity', Math.max(0, parseInt(e.target.value) || 0))} />
+          <small className="muted" style={{ display: 'block', marginTop: '4px' }}>
+            Stock will be subtracted automatically when an order is marked as paid.
+          </small>
+        </div>
         <div className="form-field full">
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
             <input
@@ -452,7 +460,7 @@ function ProductsTab({ products, onSave }) {
         ) : (
           <table className="admin-table">
             <thead>
-              <tr><th></th><th>Name</th><th>Category</th><th>Price</th><th>Rating</th><th></th></tr>
+              <tr><th></th><th>Name</th><th>Category</th><th>Price</th><th>Qty</th><th>Rating</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.map((p) => (
@@ -461,6 +469,7 @@ function ProductsTab({ products, onSave }) {
                   <td><strong>{p.name}</strong>{p.outOfStock ? <span style={{ color: '#dc2626', fontSize: '0.75rem', fontWeight: 700, marginLeft: '6px' }}>OUT OF STOCK</span> : null}{p.brand ? <div className="muted">{p.brand}{p.subcategory ? ` · ${p.subcategory}` : ''}</div> : null}</td>
                   <td>{p.category}</td>
                   <td>{p.price}</td>
+                  <td>{p.quantity ?? 0}</td>
                   <td>★ {p.rating}</td>
                   <td style={{ textAlign: 'right' }}>
                     <button type="button" className="btn ghost small" onClick={() => navigate(`${ADMIN_PATH}/products/${p.id}/edit`)}>Edit</button>{' '}

@@ -27,6 +27,20 @@ orderRouter.post('/', requireUser, async (req, res) => {
   if (!phone) return res.status(400).json({ error: 'Enter a valid phone number' })
   if (items.length === 0) return res.status(400).json({ error: 'Your cart is empty' })
 
+  // Check stock availability for each item
+  for (const item of items) {
+    if (!item.id) continue
+    const qty = item.qty ?? 1
+    const stock = await pool.query('SELECT quantity, out_of_stock, name FROM products WHERE id = $1 AND active = true', [item.id])
+    if (stock.rowCount === 0) {
+      return res.status(400).json({ error: `"${item.name}" is no longer available` })
+    }
+    const product = stock.rows[0]
+    if (product.out_of_stock || product.quantity < qty) {
+      return res.status(400).json({ error: `"${product.name}" has insufficient stock (available: ${product.quantity})` })
+    }
+  }
+
   const total = items.reduce((sum, i) => sum + parsePrice(i.price) * (i.qty ?? 1), 0)
 
   const result = await pool.query(
@@ -177,11 +191,45 @@ orderAdminRouter.put('/:id/payment', async (req, res) => {
   if (!allowed.includes(payment_status)) {
     return res.status(400).json({ error: 'Invalid payment_status' })
   }
+
+  // Fetch current order to check previous payment status
+  const existing = await pool.query('SELECT * FROM orders WHERE id = $1', [req.params.id])
+  if (existing.rowCount === 0) return res.status(404).json({ error: 'Order not found' })
+  const order = existing.rows[0]
+
+  // Subtract stock when marking as paid (only if not already paid)
+  if (payment_status === 'paid' && order.payment_status !== 'paid') {
+    const items = order.items ?? []
+    for (const item of items) {
+      if (!item.id) continue
+      const qty = item.qty ?? 1
+      await pool.query(
+        `UPDATE products SET quantity = GREATEST(quantity - $1, 0),
+         out_of_stock = CASE WHEN quantity - $1 <= 0 THEN true ELSE out_of_stock END
+         WHERE id = $2 AND active = true`,
+        [qty, item.id]
+      )
+    }
+  }
+
+  // Restore stock if un-marking as paid (revert the deduction)
+  if (payment_status !== 'paid' && order.payment_status === 'paid') {
+    const items = order.items ?? []
+    for (const item of items) {
+      if (!item.id) continue
+      const qty = item.qty ?? 1
+      await pool.query(
+        `UPDATE products SET quantity = quantity + $1, out_of_stock = false
+         WHERE id = $2 AND active = true`,
+        [qty, item.id]
+      )
+    }
+  }
+
   const result = await pool.query(
     'UPDATE orders SET payment_status = $1 WHERE id = $2 RETURNING *',
     [payment_status, req.params.id]
   )
-  if (result.rowCount === 0) return res.status(404).json({ error: 'Order not found' })
   res.json({ ok: true, order: result.rows[0] })
 })
 

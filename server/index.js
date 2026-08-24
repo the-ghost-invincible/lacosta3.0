@@ -73,6 +73,7 @@ async function readData() {
       specs: p.specs,
       badge: p.badge,
       outOfStock: p.out_of_stock,
+      quantity: p.quantity,
     }))
 
     // Merge with fallback data from JSON file
@@ -115,22 +116,22 @@ async function writeProduct(product) {
       await client.query(
         `UPDATE products SET name = $1, category = $2, brand = $3, subcategory = $4,
          price = $5, old_price = $6, seller = $7, rating = $8, image = $9,
-         description = $10, specs = $11, badge = $12, out_of_stock = $13, updated_at = now()
-         WHERE id = $14`,
+         description = $10, specs = $11, badge = $12, out_of_stock = $13, quantity = $14, updated_at = now()
+         WHERE id = $15`,
         [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
          product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
          product.image ?? null, product.description ?? null, JSON.stringify(product.specs ?? []),
-         product.badge ?? null, product.outOfStock ?? false, product.id]
+         product.badge ?? null, product.outOfStock ?? false, product.quantity ?? 0, product.id]
       )
     } else {
       const result = await client.query(
-        `INSERT INTO products (name, category, brand, subcategory, price, old_price, seller, rating, image, description, specs, badge, out_of_stock)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        `INSERT INTO products (name, category, brand, subcategory, price, old_price, seller, rating, image, description, specs, badge, out_of_stock, quantity)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          RETURNING id`,
         [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
          product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
          product.image ?? null, product.description ?? null, JSON.stringify(product.specs ?? []),
-         product.badge ?? null, product.outOfStock ?? false]
+         product.badge ?? null, product.outOfStock ?? false, product.quantity ?? 0]
       )
       product.id = result.rows[0].id
     }

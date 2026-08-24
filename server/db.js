@@ -121,4 +121,6 @@ export async function initDb() {
   await pool.query(TOKENS_TABLE)
   // Out-of-stock migration
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS out_of_stock BOOLEAN NOT NULL DEFAULT false")
+  // Quantity/inventory migration
+  await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 0")
 }
