@@ -58,6 +58,8 @@ export function HistoryPage() {
     }
 
     fetchStatuses()
+    const interval = setInterval(fetchStatuses, 10000)
+    return () => clearInterval(interval)
   }, [])
 
   const removeEntry = (id) => {
