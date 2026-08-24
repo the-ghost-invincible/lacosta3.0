@@ -382,6 +382,17 @@
 :root[data-theme='dark'] .status-canceled { background: #3c1520; color: #fca5a5; }
 :root[data-theme='dark'] .status-delivered { background: #12301c; color: #86efac; }
 
+.payment-pending { background: #fef3c7; color: #92400e; }
+.payment-paid { background: #dcfce7; color: #166534; }
+.payment-failed { background: #fee2e2; color: #991b1b; }
+
+:root[data-theme='dark'] .payment-pending { background: #3a2c10; color: #fbbf24; }
+:root[data-theme='dark'] .payment-paid { background: #12301c; color: #86efac; }
+:root[data-theme='dark'] .payment-failed { background: #3c1520; color: #fca5a5; }
+
+.paid-btn { background: #16a34a; }
+.paid-btn:hover { background: #15803d; }
+
 .admin-table-wrap { overflow-x: auto; }
 
 .nowrap { white-space: nowrap; }

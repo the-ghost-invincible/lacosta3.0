@@ -477,6 +477,7 @@ function ProductsTab({ products, onSave }) {
 }
 
 const STATUS_LABELS = { pending: 'Pending', confirmed: 'Confirmed', canceled: 'Canceled', delivered: 'Delivered' }
+const PAYMENT_STATUS_LABELS = { pending: 'Unpaid', paid: 'Paid', failed: 'Failed' }
 
 function CustomersTab() {
   const [customers, setCustomers] = useState([])
@@ -660,6 +661,16 @@ function OrdersTab() {
     if (res.ok) load()
   }
 
+  const setPaymentStatus = async (id, payment_status) => {
+    setBusyId(id)
+    const res = await api(`/api/admin/orders/${id}/payment`, {
+      method: 'PUT',
+      body: JSON.stringify({ payment_status }),
+    })
+    setBusyId(null)
+    if (res.ok) load()
+  }
+
   const removeOrder = async (id) => {
     if (!confirm('Delete this order permanently?')) return
     setBusyId(id)
@@ -703,7 +714,7 @@ function OrdersTab() {
         <div>
           <h2>Orders</h2>
           <p className="panel-hint">
-            {orders.length} orders total · {orders.filter((o) => o.status === 'pending').length} pending
+            {orders.length} orders total · {orders.filter((o) => o.status === 'pending').length} pending · {orders.filter((o) => (o.payment_status ?? 'pending') !== 'paid').length} unpaid
           </p>
         </div>
         <button type="button" className="btn ghost small" onClick={load}>Refresh</button>
@@ -759,6 +770,7 @@ function OrdersTab() {
                 <th>Items</th>
                 <th>Total</th>
                 <th>Status</th>
+                <th>Payment</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -793,6 +805,11 @@ function OrdersTab() {
                       {STATUS_LABELS[order.status] ?? order.status}
                     </span>
                   </td>
+                  <td>
+                    <span className={`status-badge payment-${order.payment_status ?? 'pending'}`}>
+                      {PAYMENT_STATUS_LABELS[order.payment_status ?? 'pending'] ?? order.payment_status}
+                    </span>
+                  </td>
                   <td className="nowrap">
                     <button
                       type="button"
@@ -801,6 +818,18 @@ function OrdersTab() {
                     >
                       View
                     </button>{' '}
+                    {(order.payment_status ?? 'pending') !== 'paid' ? (
+                      <button
+                        type="button"
+                        className="btn small paid-btn"
+                        disabled={busyId === order.id}
+                        onClick={() => setPaymentStatus(order.id, 'paid')}
+                      >
+                        Mark Paid
+                      </button>
+                    ) : (
+                      <span className="status-badge payment-paid">Paid</span>
+                    )}{' '}
                     {order.status === 'pending' && (
                       <>
                         <button
@@ -869,6 +898,9 @@ function OrdersTab() {
               <span className={`status-badge status-${viewOrder.status}`}>
                 {STATUS_LABELS[viewOrder.status] ?? viewOrder.status}
               </span>
+              <span className={`status-badge payment-${viewOrder.payment_status ?? 'pending'}`} style={{ marginLeft: '0.5rem' }}>
+                {PAYMENT_STATUS_LABELS[viewOrder.payment_status ?? 'pending'] ?? viewOrder.payment_status}
+              </span>
             </div>
 
             <div className="order-detail-customer">
@@ -909,6 +941,19 @@ function OrdersTab() {
             </div>
 
             <div className="form-actions">
+              {(viewOrder.payment_status ?? 'pending') !== 'paid' && (
+                <button
+                  type="button"
+                  className="btn paid-btn"
+                  disabled={busyId === viewOrder.id}
+                  onClick={async () => {
+                    await setPaymentStatus(viewOrder.id, 'paid')
+                    setViewOrder((prev) => prev ? { ...prev, payment_status: 'paid' } : prev)
+                  }}
+                >
+                  Mark as Paid
+                </button>
+              )}
               <button type="button" className="btn ghost" onClick={() => setViewOrder(null)}>Close</button>
             </div>
           </div>

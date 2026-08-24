@@ -170,6 +170,21 @@ orderAdminRouter.put('/:id/status', async (req, res) => {
   res.json({ ok: true, order })
 })
 
+// Update an order's payment status (admin)
+orderAdminRouter.put('/:id/payment', async (req, res) => {
+  const { payment_status } = req.body ?? {}
+  const allowed = ['pending', 'paid', 'failed']
+  if (!allowed.includes(payment_status)) {
+    return res.status(400).json({ error: 'Invalid payment_status' })
+  }
+  const result = await pool.query(
+    'UPDATE orders SET payment_status = $1 WHERE id = $2 RETURNING *',
+    [payment_status, req.params.id]
+  )
+  if (result.rowCount === 0) return res.status(404).json({ error: 'Order not found' })
+  res.json({ ok: true, order: result.rows[0] })
+})
+
 // Delete a user permanently (admin, requires password confirmation)
 orderAdminRouter.delete('/user/:id', async (req, res) => {
   const password = String(req.body?.password ?? '')
