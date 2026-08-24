@@ -193,7 +193,7 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
             className="btn ghost small ngrok-badge"
             title="Open your store"
           >
-            <span className="site-logo">L</span> lacostamarkets.site
+            <span className="site-logo"><img src="/logo.png" alt="Lacosta" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '6px' }} /></span> lacostamarkets.site
           </a>
           <button
             type="button"

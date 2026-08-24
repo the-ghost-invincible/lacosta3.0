@@ -84,10 +84,7 @@
   width: 22px;
   height: 22px;
   border-radius: 6px;
-  background: linear-gradient(135deg, #a3e635, #65a30d);
-  color: white;
-  font-weight: 900;
-  font-size: 0.75rem;
+  overflow: hidden;
   flex-shrink: 0;
 }
 

@@ -38,10 +38,7 @@
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #a3e635, #65a30d);
-  color: white;
-  font-weight: 800;
-  font-size: 1.2rem;
+  overflow: hidden;
   box-shadow: 0 12px 24px rgba(132, 204, 22, 0.35);
 }
 

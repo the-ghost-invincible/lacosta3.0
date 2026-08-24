@@ -160,7 +160,7 @@ export function Header() {
       <header className="topbar">
         <div className="container topbar-inner">
           <Link to="/" className="brand-wrap" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <div className="brand-mark">L</div>
+            <div className="brand-mark"><img src="/logo.png" alt="Lacosta" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '12px' }} /></div>
             <div>
               <span className="brand-name">Lacosta</span>
               <small>Marketplace</small>
