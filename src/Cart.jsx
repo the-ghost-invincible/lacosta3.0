@@ -150,7 +150,6 @@ export function CartPage() {
 
   const checkout = () => {
     if (!items.length) return
-    if (!confirm('Save these items to your purchase history and clear the cart?')) return
     saveToHistory(items, total, currency)
     clearCart()
     setCheckedOut(true)
@@ -195,6 +194,7 @@ export function CartPage() {
         {checkedOut && (
           <p className="order-success">
             Items saved to your <strong>purchase history</strong>! Your cart has been cleared.{' '}
+            Lacosta Markets will call to confirm your delivery location.{' '}
             <button type="button" className="text-btn" onClick={() => navigate('/history')} style={{ textDecoration: 'underline' }}>
               View history
             </button>
