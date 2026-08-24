@@ -123,4 +123,7 @@ export async function initDb() {
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS out_of_stock BOOLEAN NOT NULL DEFAULT false")
   // Quantity/inventory migration
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 0")
+  // Sync out_of_stock flag with quantity
+  await pool.query("UPDATE products SET out_of_stock = true WHERE quantity <= 0 AND out_of_stock = false")
+  await pool.query("UPDATE products SET out_of_stock = false WHERE quantity > 0 AND out_of_stock = true")
 }

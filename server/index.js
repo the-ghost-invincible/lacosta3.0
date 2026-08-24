@@ -112,6 +112,7 @@ async function writeProduct(product) {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    const autoOutOfStock = (product.quantity ?? 0) <= 0
     if (product.id) {
       await client.query(
         `UPDATE products SET name = $1, category = $2, brand = $3, subcategory = $4,
@@ -121,7 +122,7 @@ async function writeProduct(product) {
         [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
          product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
          product.image ?? null, product.description ?? null, JSON.stringify(product.specs ?? []),
-         product.badge ?? null, product.outOfStock ?? false, product.quantity ?? 0, product.id]
+         product.badge ?? null, autoOutOfStock, product.quantity ?? 0, product.id]
       )
     } else {
       const result = await client.query(
@@ -131,7 +132,7 @@ async function writeProduct(product) {
         [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
          product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
          product.image ?? null, product.description ?? null, JSON.stringify(product.specs ?? []),
-         product.badge ?? null, product.outOfStock ?? false, product.quantity ?? 0]
+         product.badge ?? null, autoOutOfStock, product.quantity ?? 0]
       )
       product.id = result.rows[0].id
     }
