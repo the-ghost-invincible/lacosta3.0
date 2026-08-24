@@ -195,11 +195,6 @@ export function CartPage() {
             Payment confirmed! M-Pesa receipt: <strong>{mpesaReceipt}</strong>. Your order is being processed.
           </p>
         )}
-        {orderPlaced && paymentMethod === 'mpesa' && mpesaStatus === 'pending' && (
-          <p className="order-success" style={{ background: '#fffbeb', borderColor: '#f59e0b' }}>
-            Check your phone for the M-Pesa prompt. Enter your PIN to complete payment.
-          </p>
-        )}
         {orderPlaced && paymentMethod === 'mpesa' && mpesaStatus === 'failed' && (
           <div className="order-success" style={{ background: '#fef2f2', borderColor: '#ef4444' }}>
             <p>Payment failed: {mpesaError}</p>
@@ -354,12 +349,6 @@ export function CartPage() {
                 </label>
               </div>
             </div>
-
-            {paymentMethod === 'mpesa' && (
-              <p style={{ fontSize: '0.85rem', color: 'var(--muted, #666)', marginBottom: '1rem' }}>
-                You&apos;ll receive an M-Pesa STK prompt on your phone to complete payment.
-              </p>
-            )}
 
             {mpesaError && <p className="error">{mpesaError}</p>}
             <button type="submit" className="primary-btn" disabled={phoneBusy || mpesaBusy}>
