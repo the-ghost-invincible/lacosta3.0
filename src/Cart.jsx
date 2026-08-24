@@ -18,13 +18,14 @@ function loadHistory() {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) ?? [] } catch { return [] }
 }
 
-function saveToHistory(items, total, currency) {
+function saveToHistory(items, total, currency, serverOrderId = null) {
   const history = loadHistory()
   history.unshift({
     id: Date.now(),
     date: new Date().toISOString(),
     items: items.map((i) => ({ ...i })),
     total: formatMoney(total, currency),
+    orderId: serverOrderId,
   })
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
 }
@@ -148,9 +149,26 @@ export function CartPage() {
     setMpesaError('Payment timed out — check your M-Pesa messages')
   }
 
-  const checkout = () => {
+  const checkout = async () => {
     if (!items.length) return
-    saveToHistory(items, total, currency)
+
+    let serverOrderId = null
+
+    if (user && user.phone) {
+      try {
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: user.displayName || user.email, phone: user.phone, items }),
+        })
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}))
+          serverOrderId = data.order?.id ?? null
+        }
+      } catch {}
+    }
+
+    saveToHistory(items, total, currency, serverOrderId)
     clearCart()
     setCheckedOut(true)
   }

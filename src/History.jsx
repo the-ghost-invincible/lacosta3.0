@@ -14,13 +14,50 @@ function clearHistory() {
   localStorage.removeItem(HISTORY_KEY)
 }
 
+const STATUS_LABELS = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  paid: 'Paid',
+  delivered: 'Delivered',
+  canceled: 'Cancelled',
+}
+
+const STATUS_CLASSES = {
+  pending: 'status-pending',
+  confirmed: 'status-confirmed',
+  paid: 'status-paid',
+  delivered: 'status-delivered',
+  canceled: 'status-cancelled',
+}
+
 export function HistoryPage() {
   const navigate = useNavigate()
   const { addToCart } = useCart()
   const [history, setHistory] = useState([])
+  const [orderStatuses, setOrderStatuses] = useState({})
 
   useEffect(() => {
-    setHistory(loadHistory())
+    const loaded = loadHistory()
+    setHistory(loaded)
+
+    const fetchStatuses = async () => {
+      const ids = loaded.filter((e) => e.orderId).map((e) => e.orderId)
+      if (!ids.length) return
+
+      try {
+        const res = await fetch('/api/orders/mine')
+        if (!res.ok) return
+        const data = await res.json()
+        const orders = Array.isArray(data.orders) ? data.orders : []
+        const map = {}
+        for (const o of orders) {
+          map[o.id] = o.status
+        }
+        setOrderStatuses(map)
+      } catch {}
+    }
+
+    fetchStatuses()
   }, [])
 
   const removeEntry = (id) => {
@@ -73,36 +110,47 @@ export function HistoryPage() {
           </div>
         ) : (
           <div className="order-history-list">
-            {history.map((entry) => (
-              <div key={entry.id} className="order-history-card">
-                <div className="order-history-head">
-                  <div>
-                    <strong>Purchase</strong>
-                    <span className="muted" style={{ marginLeft: '8px' }}>{fmtDate(entry.date)}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button type="button" className="btn ghost small" onClick={() => reorder(entry)}>Reorder</button>
-                    <button type="button" className="btn danger small" onClick={() => removeEntry(entry.id)}>✕</button>
-                  </div>
-                </div>
-                <div className="order-history-items">
-                  {(entry.items ?? []).map((item, idx) => (
-                    <div key={idx} className="order-history-item">
-                      {item.image && <img src={item.image} alt="" className="order-history-img" />}
-                      <div>
-                        <span>{item.name}</span>
-                        <span className="muted"> x{item.qty ?? 1}</span>
-                      </div>
-                      <strong>{item.price}</strong>
+            {history.map((entry) => {
+              const serverStatus = entry.orderId ? orderStatuses[entry.orderId] : null
+              return (
+                <div key={entry.id} className="order-history-card">
+                  <div className="order-history-head">
+                    <div>
+                      <strong>Purchase</strong>
+                      <span className="muted" style={{ marginLeft: '8px' }}>{fmtDate(entry.date)}</span>
+                      {entry.orderId && (
+                        <span className="muted" style={{ marginLeft: '8px' }}>#{entry.orderId}</span>
+                      )}
                     </div>
-                  ))}
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      {serverStatus && (
+                        <span className={`order-status-badge ${STATUS_CLASSES[serverStatus] ?? ''}`}>
+                          {STATUS_LABELS[serverStatus] ?? serverStatus}
+                        </span>
+                      )}
+                      <button type="button" className="btn ghost small" onClick={() => reorder(entry)}>Reorder</button>
+                      <button type="button" className="btn danger small" onClick={() => removeEntry(entry.id)}>✕</button>
+                    </div>
+                  </div>
+                  <div className="order-history-items">
+                    {(entry.items ?? []).map((item, idx) => (
+                      <div key={idx} className="order-history-item">
+                        {item.image && <img src={item.image} alt="" className="order-history-img" />}
+                        <div>
+                          <span>{item.name}</span>
+                          <span className="muted"> x{item.qty ?? 1}</span>
+                        </div>
+                        <strong>{item.price}</strong>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="order-history-total">
+                    <span>Total</span>
+                    <strong>{entry.total}</strong>
+                  </div>
                 </div>
-                <div className="order-history-total">
-                  <span>Total</span>
-                  <strong>{entry.total}</strong>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </main>

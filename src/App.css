@@ -480,6 +480,66 @@
   font-size: 0.95rem;
 }
 
+.order-status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-confirmed {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-paid {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-delivered {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-cancelled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+:root[data-theme='dark'] .status-pending {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+:root[data-theme='dark'] .status-confirmed {
+  background: #1e3a5f;
+  color: #93c5fd;
+}
+
+:root[data-theme='dark'] .status-paid {
+  background: #064e3b;
+  color: #6ee7b7;
+}
+
+:root[data-theme='dark'] .status-delivered {
+  background: #064e3b;
+  color: #6ee7b7;
+}
+
+:root[data-theme='dark'] .status-cancelled {
+  background: #7f1d1d;
+  color: #fca5a5;
+}
+
 .auth-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-2);
