@@ -228,6 +228,7 @@ orderAdminRouter.put('/:id/payment', async (req, res) => {
         [qty, item.id]
       )
     }
+    process.emit('invalidate-data-cache')
   }
 
   // Restore stock if un-marking as paid (revert the deduction)
@@ -242,6 +243,7 @@ orderAdminRouter.put('/:id/payment', async (req, res) => {
         [qty, item.id]
       )
     }
+    process.emit('invalidate-data-cache')
   }
 
   const result = await pool.query(

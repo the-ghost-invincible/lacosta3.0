@@ -39,6 +39,11 @@ let siteDataCache = null
 let siteDataCacheTime = 0
 const SITE_CACHE_TTL = 5000 // 5 seconds
 
+// Allow other modules (e.g. orders.js) to invalidate the cache
+process.on('invalidate-data-cache', () => {
+  siteDataCache = null
+})
+
 async function readData() {
   try {
     // Try to read from database first
