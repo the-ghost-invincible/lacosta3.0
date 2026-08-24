@@ -178,6 +178,12 @@ export function Home() {
                       <span className="stock-low">Only {product.quantity} left</span>
                     )}
                     <button type="button" disabled={product.outOfStock} onClick={(event) => { event.stopPropagation(); handleAdd(product) }}>{justAddedId === product.id ? "Added ✓" : product.outOfStock ? "Out of stock" : "Add to cart"}</button>
+                    {!product.outOfStock && (product.quantity ?? 0) > 0 && (
+                      <span className="stock-info">{product.quantity} in stock</span>
+                    )}
+                {!product.outOfStock && (product.quantity ?? 0) > 0 && (
+                  <span className="stock-info">{product.quantity} in stock</span>
+                )}
                   </div>
                 </article>
               ))}
@@ -212,6 +218,9 @@ export function Home() {
               <button type="button" className="primary-btn" disabled={currentProduct.outOfStock} onClick={() => handleAdd(currentProduct)}>{justAddedId === currentProduct.id ? "Added ✓" : currentProduct.outOfStock ? "Out of stock" : "Add to cart"}</button>
               <button type="button" className="secondary-btn">Buy now</button>
             </div>
+            {!currentProduct.outOfStock && (currentProduct.quantity ?? 0) > 0 && (
+              <span className="stock-info">{currentProduct.quantity} in stock</span>
+            )}
 
             <div className="seller-box">
               <div>

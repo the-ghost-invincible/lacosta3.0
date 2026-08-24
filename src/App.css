@@ -1107,6 +1107,19 @@
   margin-bottom: 6px;
 }
 
+.stock-info {
+  display: block;
+  text-align: center;
+  color: #16a34a;
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+:root[data-theme='dark'] .stock-info {
+  color: #4ade80;
+}
+
 .card-body {
   padding: 16px;
 }
