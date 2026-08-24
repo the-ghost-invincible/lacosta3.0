@@ -13,7 +13,7 @@ export function CategoryPage() {
   const detailRef = useRef(null)
   const catalogRef = useRef(null)
   const { categories, catalogProducts, deals, trendingProducts, categoryMenus } = useSiteData()
-  const { addToCart, cartQty } = useCart()
+  const { addToCart, reservedQty } = useCart()
   const [justAddedId, setJustAddedId] = useState(null)
 
   const handleAdd = (product) => {
@@ -337,7 +337,7 @@ export function CategoryPage() {
             {visibleProducts.length > 0 ? (
               <div className="catalog-grid">
                 {sortedVisible.map((product) => {
-                  const remaining = (product.quantity ?? 0) - cartQty(product.id)
+                  const remaining = (product.quantity ?? 0) - reservedQty(product.id)
                   const soldOut = product.outOfStock || remaining <= 0
                   return (
                   <article
@@ -386,7 +386,7 @@ export function CategoryPage() {
           {currentProduct && (
             <aside className="detail-panel" ref={detailRef}>
                 {(() => {
-                  const catRemaining = (currentProduct.quantity ?? 0) - cartQty(currentProduct.id)
+                  const catRemaining = (currentProduct.quantity ?? 0) - reservedQty(currentProduct.id)
                   const catSoldOut = currentProduct.outOfStock || catRemaining <= 0
                   return (
                 <>

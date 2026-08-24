@@ -206,6 +206,25 @@ app.use('/api/auth', authLimiter, authRouter)
 // ---------- Cart (per user) ----------
 app.use('/api/cart', cartRouter)
 
+// ---------- Stock reservations (how many items are in all users' carts) ----------
+app.get('/api/stock/reserved', async (_req, res) => {
+  try {
+    const result = await pool.query('SELECT items FROM carts')
+    const reserved = {}
+    for (const row of result.rows) {
+      const items = Array.isArray(row.items) ? row.items : []
+      for (const item of items) {
+        if (!item.id) continue
+        const pid = String(item.id)
+        reserved[pid] = (reserved[pid] || 0) + (item.qty ?? 1)
+      }
+    }
+    res.json({ reserved })
+  } catch {
+    res.json({ reserved: {} })
+  }
+})
+
 // ---------- Orders ----------
 app.use('/api/orders', orderRouter)
 app.get('/api/admin/customers', requireAuth, getCustomers)

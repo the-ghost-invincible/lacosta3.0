@@ -17,12 +17,10 @@ export function CartProvider({ children }) {
   const { user, loading } = useAuth()
   const [items, setItems] = useState([])
   const [ready, setReady] = useState(false)
+  const [reservedStock, setReservedStock] = useState({})
   const prevUserRef = useRef(null)
 
-  // Load the right cart whenever the auth state changes:
-  // logged in   -> the user's saved cart from the server
-  // just logged out -> basket resets to empty
-  // fresh guest -> guest cart kept in localStorage
+  // Load the right cart whenever the auth state changes
   useEffect(() => {
     if (loading) return
     let cancelled = false
@@ -34,8 +32,6 @@ export function CartProvider({ children }) {
         .then((data) => {
           if (cancelled) return
           const serverItems = Array.isArray(data.items) ? data.items : []
-          // Keep the guest's items when the account cart is empty, so items
-          // added before signing up are preserved on the account.
           const merged = serverItems.length ? serverItems : loadCart()
           setItems(merged)
           setReady(true)
@@ -54,9 +50,7 @@ export function CartProvider({ children }) {
       }
       setReady(true)
     }
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [user, loading])
 
   // Persist changes immediately: to the server when signed in, and always to
@@ -72,6 +66,19 @@ export function CartProvider({ children }) {
       }).catch(() => {})
     }
   }, [items, user, ready])
+
+  // Fetch reserved stock (qty in ALL users' carts) periodically
+  useEffect(() => {
+    const fetchReserved = () => {
+      fetch('/api/stock/reserved')
+        .then((r) => r.json())
+        .then((data) => setReservedStock(data.reserved ?? {}))
+        .catch(() => {})
+    }
+    fetchReserved()
+    const interval = setInterval(fetchReserved, 10000)
+    return () => clearInterval(interval)
+  }, [])
 
   const addToCart = (product) => {
     if (product.outOfStock) return
@@ -118,9 +125,15 @@ export function CartProvider({ children }) {
     0
   )
 
+  // How many of this product the current user has in their cart
   const cartQty = (productId) => {
     const item = items.find((i) => i.id === productId)
     return item ? item.qty : 0
+  }
+
+  // How many of this product ALL users have reserved (in their carts)
+  const reservedQty = (productId) => {
+    return reservedStock[String(productId)] ?? 0
   }
 
   const value = {
@@ -133,6 +146,7 @@ export function CartProvider({ children }) {
     total,
     parsePrice,
     cartQty,
+    reservedQty,
   }
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>

@@ -8,7 +8,7 @@ import './App.css'
 
 export function Home() {
   const { catalogProducts, featuredProducts, deals, trendingProducts, benefits, siteContent } = useSiteData()
-  const { addToCart, cartQty } = useCart()
+  const { addToCart, reservedQty } = useCart()
   const [selectedProductId, setSelectedProductId] = useState(catalogProducts[0]?.id ?? null)
   const [justAddedId, setJustAddedId] = useState(null)
   const [modalProduct, setModalProduct] = useState(null)
@@ -104,7 +104,7 @@ export function Home() {
 
         <section className="product-grid">
           {featuredProducts.map((product) => {
-            const remaining = (product.quantity ?? 0) - cartQty(product.id)
+            const remaining = (product.quantity ?? 0) - reservedQty(product.id)
             const soldOut = product.outOfStock || remaining <= 0
             return (
             <article key={product.id} className="product-card" onClick={() => setModalProduct(product)}>
@@ -157,7 +157,7 @@ export function Home() {
 
             <div className="catalog-grid">
               {sortedProducts.map((product) => {
-                const remaining = (product.quantity ?? 0) - cartQty(product.id)
+                const remaining = (product.quantity ?? 0) - reservedQty(product.id)
                 const soldOut = product.outOfStock || remaining <= 0
                 return (
                 <article
@@ -200,7 +200,7 @@ export function Home() {
 
           <aside className="detail-panel">
             {(() => {
-              const curRemaining = (currentProduct.quantity ?? 0) - cartQty(currentProduct.id)
+              const curRemaining = (currentProduct.quantity ?? 0) - reservedQty(currentProduct.id)
               const curSoldOut = currentProduct.outOfStock || curRemaining <= 0
               return (
             <>

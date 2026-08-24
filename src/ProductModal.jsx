@@ -3,12 +3,12 @@ import { useCart } from './CartContext'
 import './App.css'
 
 export function ProductModal({ product, onClose }) {
-  const { addToCart, cartQty } = useCart()
+  const { addToCart, reservedQty } = useCart()
   const [justAdded, setJustAdded] = useState(false)
 
   if (!product) return null
 
-  const remaining = (product.quantity ?? 0) - cartQty(product.id)
+  const remaining = (product.quantity ?? 0) - reservedQty(product.id)
   const soldOut = product.outOfStock || remaining <= 0
 
   const handleAdd = () => {
