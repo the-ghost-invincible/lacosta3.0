@@ -23,6 +23,7 @@ export function ProductModal({ product, onClose }) {
 
         <div className="product-modal-image">
           <img src={product.image} alt={product.name} />
+          {product.outOfStock && <span className="product-badge" style={{ background: '#dc2626', color: '#fff' }}>Out of stock</span>}
         </div>
 
         <div className="product-modal-body">
@@ -38,6 +39,10 @@ export function ProductModal({ product, onClose }) {
             <strong>{product.price}</strong>
             {product.oldPrice && <span>{product.oldPrice}</span>}
           </div>
+
+          <span className={`detail-badge ${product.outOfStock ? 'out-of-stock' : ''}`}>
+            {product.outOfStock ? 'Out of stock' : (product.quantity ?? 0) > 0 ? `In stock (${product.quantity})` : 'In stock'}
+          </span>
 
           {product.description && <p className="detail-description">{product.description}</p>}
 

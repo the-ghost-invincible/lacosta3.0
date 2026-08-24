@@ -74,6 +74,7 @@ export function CartProvider({ children }) {
   }, [items, user, ready])
 
   const addToCart = (product) => {
+    if (product.outOfStock) return
     const snapshot = {
       id: product.id,
       name: product.name,

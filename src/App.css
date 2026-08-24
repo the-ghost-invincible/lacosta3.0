@@ -713,6 +713,7 @@
 }
 
 .product-modal-image {
+  position: relative;
   background: var(--bg-img);
   height: 300px;
   display: flex;
@@ -1096,6 +1097,14 @@
   border-radius: 999px;
   font-size: 0.68rem;
   font-weight: 800;
+}
+
+.stock-low {
+  display: inline-block;
+  color: #ea580c;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-bottom: 6px;
 }
 
 .card-body {

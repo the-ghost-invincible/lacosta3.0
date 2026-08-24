@@ -344,6 +344,11 @@ export function CategoryPage() {
                   >
                     <div className="card-image-wrap">
                       <img src={product.image} alt={product.name} />
+                      {product.outOfStock ? (
+                        <span className="product-badge" style={{ background: '#dc2626', color: '#fff' }}>Out of stock</span>
+                      ) : product.badge ? (
+                        <span className="product-badge">{product.badge}</span>
+                      ) : null}
                     </div>
                     <div className="card-body">
                       <span className="product-category">{product.category}</span>
@@ -356,6 +361,9 @@ export function CategoryPage() {
                         <strong>{product.price}</strong>
                         <span>{product.oldPrice}</span>
                       </div>
+                      {!product.outOfStock && (product.quantity ?? 0) > 0 && (product.quantity ?? 0) <= 5 && (
+                        <span className="stock-low">Only {product.quantity} left</span>
+                      )}
                       <button type="button" disabled={product.outOfStock} onClick={(event) => { event.stopPropagation(); handleAdd(product) }}>{justAddedId === product.id ? "Added ✓" : product.outOfStock ? "Out of stock" : "Add to cart"}</button>
                     </div>
                   </article>
@@ -375,7 +383,7 @@ export function CategoryPage() {
                 </div>
 
                 <div className="detail-meta">
-                  <span className={`detail-badge ${currentProduct.outOfStock ? 'out-of-stock' : ''}`}>{currentProduct.outOfStock ? 'Out of stock' : 'In stock'}</span>
+                  <span className={`detail-badge ${currentProduct.outOfStock ? 'out-of-stock' : ''}`}>{currentProduct.outOfStock ? 'Out of stock' : (currentProduct.quantity ?? 0) > 0 ? `In stock (${currentProduct.quantity})` : 'In stock'}</span>
                   <span className="detail-rating">★ {currentProduct.rating}</span>
                 </div>
 
