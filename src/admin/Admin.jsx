@@ -105,6 +105,15 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
     api('/api/admin/ngrok').then((res) => res.json()).then((d) => setNgrokUrl(d.url)).catch(() => {})
   }, [])
 
+  // Auto-refresh product data every 10s so quantity changes show immediately
+  useEffect(() => {
+    if (tab !== 'products') return
+    const interval = setInterval(() => {
+      api('/api/data').then((res) => res.json()).then(setDb).catch(() => {})
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [tab])
+
   const flash = (text) => {
     setMsg(text)
     setTimeout(() => setMsg(null), 2500)
