@@ -13,7 +13,7 @@ export function CategoryPage() {
   const detailRef = useRef(null)
   const catalogRef = useRef(null)
   const { categories, catalogProducts, deals, trendingProducts, categoryMenus } = useSiteData()
-  const { addToCart } = useCart()
+  const { addToCart, cartQty } = useCart()
   const [justAddedId, setJustAddedId] = useState(null)
 
   const handleAdd = (product) => {
@@ -336,7 +336,10 @@ export function CategoryPage() {
 
             {visibleProducts.length > 0 ? (
               <div className="catalog-grid">
-                {sortedVisible.map((product) => (
+                {sortedVisible.map((product) => {
+                  const remaining = (product.quantity ?? 0) - cartQty(product.id)
+                  const soldOut = product.outOfStock || remaining <= 0
+                  return (
                   <article
                     key={product.id}
                     className={`product-card catalog-card ${currentProduct?.id === product.id ? 'selected' : ''}`}
@@ -344,7 +347,7 @@ export function CategoryPage() {
                   >
                     <div className="card-image-wrap">
                       <img src={product.image} alt={product.name} />
-                      {product.outOfStock ? (
+                      {soldOut ? (
                         <span className="product-badge" style={{ background: '#dc2626', color: '#fff' }}>Out of stock</span>
                       ) : product.badge ? (
                         <span className="product-badge">{product.badge}</span>
@@ -361,16 +364,17 @@ export function CategoryPage() {
                         <strong>{product.price}</strong>
                         <span>{product.oldPrice}</span>
                       </div>
-                      {!product.outOfStock && (product.quantity ?? 0) > 0 && (product.quantity ?? 0) <= 5 && (
-                        <span className="stock-low">Only {product.quantity} left</span>
+                      {!soldOut && remaining > 0 && remaining <= 5 && (
+                        <span className="stock-low">Only {remaining} left</span>
                       )}
-                      <button type="button" disabled={product.outOfStock} onClick={(event) => { event.stopPropagation(); handleAdd(product) }}>{justAddedId === product.id ? "Added ✓" : product.outOfStock ? "Out of stock" : "Add to cart"}</button>
-                      {!product.outOfStock && (product.quantity ?? 0) > 0 && (
-                        <span className="stock-info">{product.quantity} in stock</span>
+                      <button type="button" disabled={soldOut} onClick={(event) => { event.stopPropagation(); handleAdd(product) }}>{justAddedId === product.id ? "Added ✓" : soldOut ? "Out of stock" : "Add to cart"}</button>
+                      {!soldOut && remaining > 0 && (
+                        <span className="stock-info">{remaining} in stock</span>
                       )}
                     </div>
                   </article>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <p style={{ textAlign: 'center', padding: '2rem' }}>
@@ -381,12 +385,17 @@ export function CategoryPage() {
 
           {currentProduct && (
             <aside className="detail-panel" ref={detailRef}>
+                {(() => {
+                  const catRemaining = (currentProduct.quantity ?? 0) - cartQty(currentProduct.id)
+                  const catSoldOut = currentProduct.outOfStock || catRemaining <= 0
+                  return (
+                <>
                 <div className="detail-image-wrap">
                   <img src={currentProduct.image} alt={currentProduct.name} />
                 </div>
 
                 <div className="detail-meta">
-                  <span className={`detail-badge ${currentProduct.outOfStock ? 'out-of-stock' : ''}`}>{currentProduct.outOfStock ? 'Out of stock' : (currentProduct.quantity ?? 0) > 0 ? `In stock (${currentProduct.quantity})` : 'In stock'}</span>
+                  <span className={`detail-badge ${catSoldOut ? 'out-of-stock' : ''}`}>{catSoldOut ? 'Out of stock' : `In stock (${catRemaining})`}</span>
                   <span className="detail-rating">★ {currentProduct.rating}</span>
                 </div>
 
@@ -405,11 +414,11 @@ export function CategoryPage() {
                 </div>
 
                 <div className="detail-actions">
-                  <button type="button" className="primary-btn" disabled={currentProduct.outOfStock} onClick={() => handleAdd(currentProduct)}>{justAddedId === currentProduct.id ? "Added ✓" : currentProduct.outOfStock ? "Out of stock" : "Add to cart"}</button>
+                  <button type="button" className="primary-btn" disabled={catSoldOut} onClick={() => handleAdd(currentProduct)}>{justAddedId === currentProduct.id ? "Added ✓" : catSoldOut ? "Out of stock" : "Add to cart"}</button>
                   <button type="button" className="secondary-btn">Buy now</button>
                 </div>
-                {!currentProduct.outOfStock && (currentProduct.quantity ?? 0) > 0 && (
-                  <span className="stock-info">{currentProduct.quantity} in stock</span>
+                {!catSoldOut && catRemaining > 0 && (
+                  <span className="stock-info">{catRemaining} in stock</span>
                 )}
 
                 <div className="seller-box">
@@ -419,6 +428,9 @@ export function CategoryPage() {
                   </div>
                   <span>Verified seller</span>
                 </div>
+                </>
+                  )
+                })()}
               </aside>
             )}
           </section>

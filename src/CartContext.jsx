@@ -118,6 +118,11 @@ export function CartProvider({ children }) {
     0
   )
 
+  const cartQty = (productId) => {
+    const item = items.find((i) => i.id === productId)
+    return item ? item.qty : 0
+  }
+
   const value = {
     items,
     addToCart,
@@ -126,7 +131,8 @@ export function CartProvider({ children }) {
     clearCart,
     count,
     total,
-    parsePrice
+    parsePrice,
+    cartQty,
   }
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>

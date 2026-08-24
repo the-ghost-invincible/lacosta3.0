@@ -1241,6 +1241,19 @@
   font-weight: 700;
 }
 
+.product-card button:disabled {
+  background: #78350f;
+  color: #fbbf24;
+  cursor: not-allowed;
+  opacity: 0.85;
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .product-card button:disabled {
+  background: #451a03;
+  color: #fcd34d;
+}
+
 .catalog-layout {
   display: grid;
   grid-template-columns: 1.4fr 0.7fr;
