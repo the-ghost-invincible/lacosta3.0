@@ -76,6 +76,7 @@ export function CartPage() {
     setPhoneOpen(false)
     setOrderId(data.order?.id ?? null)
     setOrderPlaced(true)
+    clearCart()
 
     // Auto-initiate M-Pesa if selected
     if (paymentMethod === 'mpesa' && data.order?.id) {

@@ -116,6 +116,15 @@ orderRouter.post('/', requireUser, async (req, res) => {
   res.json({ ok: true, order })
 })
 
+// Get current user's order history
+orderRouter.get('/mine', requireUser, async (req, res) => {
+  const result = await pool.query(
+    'SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC, id DESC',
+    [req.user.id]
+  )
+  res.json({ orders: result.rows })
+})
+
 export const orderAdminRouter = Router()
 
 // Every registered user exactly once, with their live cart (admin).
