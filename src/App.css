@@ -1242,16 +1242,16 @@
 }
 
 .product-card button:disabled {
-  background: #78350f;
-  color: #fbbf24;
+  background: #6b7280;
+  color: #d1d5db;
   cursor: not-allowed;
   opacity: 0.85;
   box-shadow: none;
 }
 
 :root[data-theme='dark'] .product-card button:disabled {
-  background: #451a03;
-  color: #fcd34d;
+  background: #374151;
+  color: #9ca3af;
 }
 
 .catalog-layout {
