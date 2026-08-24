@@ -118,11 +118,16 @@ orderRouter.post('/', requireUser, async (req, res) => {
 
 // Get current user's order history
 orderRouter.get('/mine', requireUser, async (req, res) => {
-  const result = await pool.query(
-    'SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC, id DESC',
-    [req.user.id]
-  )
-  res.json({ orders: result.rows })
+  try {
+    const result = await pool.query(
+      'SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC, id DESC',
+      [req.user.id]
+    )
+    res.json({ orders: result.rows })
+  } catch (err) {
+    console.error('Failed to fetch user orders:', err.message)
+    res.json({ orders: [] })
+  }
 })
 
 export const orderAdminRouter = Router()

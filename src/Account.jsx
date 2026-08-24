@@ -16,7 +16,7 @@ export function AccountPage() {
 
   useEffect(() => {
     if (user) {
-      fetch('/api/orders/mine')
+      fetch('/api/orders/mine', { credentials: 'include' })
         .then((res) => res.json())
         .then((d) => setOrders(d.orders ?? []))
         .catch(() => {})
