@@ -72,7 +72,7 @@ async function readData() {
       description: p.description,
       specs: p.specs,
       badge: p.badge,
-      outOfStock: p.out_of_stock,
+      outOfStock: p.out_of_stock || p.quantity <= 0,
       quantity: p.quantity,
     }))
 
