@@ -27,18 +27,22 @@ orderRouter.post('/', requireUser, async (req, res) => {
   if (!phone) return res.status(400).json({ error: 'Enter a valid phone number' })
   if (items.length === 0) return res.status(400).json({ error: 'Your cart is empty' })
 
-  // Check stock availability for each item
-  for (const item of items) {
-    if (!item.id) continue
-    const qty = item.qty ?? 1
-    const stock = await pool.query('SELECT quantity, out_of_stock, name FROM products WHERE id = $1 AND active = true', [item.id])
-    if (stock.rowCount === 0) {
-      return res.status(400).json({ error: `"${item.name}" is no longer available` })
+  // Check stock availability for each item (skip if DB is unavailable)
+  try {
+    for (const item of items) {
+      if (!item.id) continue
+      const qty = item.qty ?? 1
+      const stock = await pool.query('SELECT quantity, out_of_stock, name FROM products WHERE id = $1 AND active = true', [item.id])
+      if (stock.rowCount === 0) {
+        return res.status(400).json({ error: `"${item.name}" is no longer available` })
+      }
+      const product = stock.rows[0]
+      if (product.out_of_stock || product.quantity < qty) {
+        return res.status(400).json({ error: `"${product.name}" has insufficient stock (available: ${product.quantity})` })
+      }
     }
-    const product = stock.rows[0]
-    if (product.out_of_stock || product.quantity < qty) {
-      return res.status(400).json({ error: `"${product.name}" has insufficient stock (available: ${product.quantity})` })
-    }
+  } catch (err) {
+    console.error('Stock check skipped (DB unavailable):', err.message)
   }
 
   const total = items.reduce((sum, i) => sum + parsePrice(i.price) * (i.qty ?? 1), 0)
