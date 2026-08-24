@@ -77,7 +77,7 @@ export function SearchResults() {
                 onClick={() => setModalProduct(product)}
               >
                 <div className="card-image-wrap">
-                  <img src={product.image} alt={product.name} />
+                  <img src={product.image} alt={product.name} loading="lazy" />
                 </div>
                 <div className="card-body">
                   <span className="product-category">{product.category}</span>

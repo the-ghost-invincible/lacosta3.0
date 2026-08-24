@@ -26,7 +26,7 @@ export function ProductModal({ product, onClose }) {
         </button>
 
         <div className="product-modal-image">
-          <img src={product.image} alt={product.name} />
+          <img src={product.image} alt={product.name} loading="lazy" />
           {soldOut && <span className="product-badge" style={{ background: '#dc2626', color: '#fff' }}>Out of stock</span>}
         </div>
 

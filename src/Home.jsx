@@ -109,7 +109,7 @@ export function Home() {
             return (
             <article key={product.id} className="product-card" onClick={() => setModalProduct(product)}>
               <div className="card-image-wrap">
-                <img src={product.image} alt={product.name} />
+                <img src={product.image} alt={product.name} loading="lazy" />
                 {soldOut ? (
                   <span className="product-badge" style={{ background: '#dc2626', color: '#fff' }}>Out of stock</span>
                 ) : (
@@ -166,7 +166,7 @@ export function Home() {
                   onClick={() => { setSelectedProductId(product.id); setModalProduct(product) }}
                 >
                   <div className="card-image-wrap">
-                    <img src={product.image} alt={product.name} />
+                    <img src={product.image} alt={product.name} loading="lazy" />
                     {soldOut ? (
                       <span className="product-badge" style={{ background: '#dc2626', color: '#fff' }}>Out of stock</span>
                     ) : product.badge ? (
@@ -205,7 +205,7 @@ export function Home() {
               return (
             <>
             <div className="detail-image-wrap">
-              <img src={currentProduct.image} alt={currentProduct.name} />
+              <img src={currentProduct.image} alt={currentProduct.name} loading="lazy" />
             </div>
 
             <div className="detail-meta">
@@ -260,7 +260,7 @@ export function Home() {
           <div className="mini-product-grid">
             {trendingProducts.map((product) => (
               <article key={product.name} className="mini-product-card" onClick={() => setModalProduct(product)}>
-                <img src={product.image} alt={product.name} />
+                <img src={product.image} alt={product.name} loading="lazy" />
                 <div>
                   <h3>{product.name}</h3>
                   <strong>{product.price}</strong>
