@@ -22,6 +22,7 @@ export function AdminPage() {
   const [authed, setAuthed] = useState(null)
   const [role, setRole] = useState(null)
   const [uniSlug, setUniSlug] = useState(null)
+  const [uniName, setUniName] = useState(null)
   const [theme, setTheme] = useState(() => localStorage.getItem('lacosta-theme') || 'light')
 
   useEffect(() => {
@@ -37,6 +38,7 @@ export function AdminPage() {
           setAuthed(true)
           setRole(data.role ?? 'superuser')
           setUniSlug(data.university ?? null)
+          setUniName(data.universityName ?? null)
         })
       })
       .catch(() => setAuthed(false))
@@ -50,12 +52,13 @@ export function AdminPage() {
     )
   }
 
-  if (!authed) return <Login onLogin={(r, slug) => { setAuthed(true); setRole(r); setUniSlug(slug) }} />
+  if (!authed) return <Login onLogin={(r, slug, name) => { setAuthed(true); setRole(r); setUniSlug(slug); setUniName(name) }} />
 
   return (
     <Dashboard
       role={role}
       uniSlug={uniSlug}
+      uniName={uniName}
       onLogout={() => setAuthed(false)}
       theme={theme}
       onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -102,7 +105,10 @@ function Login({ onLogin }) {
         body: JSON.stringify({ slug: selectedUniSlug, password }),
       })
       setBusy(false)
-      if (res.ok) onLogin('subuser', selectedUniSlug)
+      if (res.ok) {
+        const uniDisplayName = uniList.find((u) => u.slug === selectedUniSlug)?.name || selectedUniSlug
+        onLogin('subuser', selectedUniSlug, uniDisplayName)
+      }
       else setError('Wrong password or invalid university')
     }
   }
@@ -302,7 +308,7 @@ function ChangePasswordModal({ open, onClose, universitySlug }) {
   )
 }
 
-function Dashboard({ role, uniSlug, onLogout, theme, onToggleTheme }) {
+function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
   const [db, setDb] = useState(null)
   const [tab, setTab] = useState('products')
   const [msg, setMsg] = useState(null)
@@ -515,7 +521,7 @@ function Dashboard({ role, uniSlug, onLogout, theme, onToggleTheme }) {
           <img src="/logo.png" alt="Lacosta" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'contain' }} />
           <div>
             <h1>Lacosta Admin</h1>
-            <small>{role === 'subuser' ? (universities.find((u) => u.slug === uniSlug)?.name || uniSlug) : 'Manage your store'}</small>
+            <small>{role === 'subuser' ? (uniName || uniSlug) : 'Manage your store'}</small>
           </div>
         </div>
         <div className="admin-bar-actions">

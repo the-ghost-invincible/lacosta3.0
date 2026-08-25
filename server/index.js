@@ -321,10 +321,17 @@ app.post('/api/logout', (_req, res) => {
   res.json({ ok: true })
 })
 
-app.get('/api/admin/me', (req, res) => {
+app.get('/api/admin/me', async (req, res) => {
   if (sessions.has(req.cookies.adminToken)) return res.json({ ok: true, role: 'superuser' })
   if (req.cookies.uniAdminToken && uniSessions.has(req.cookies.uniAdminToken)) {
-    return res.json({ ok: true, role: 'subuser', university: req.cookies.uniAdminUniversity })
+    const slug = req.cookies.uniAdminUniversity
+    try {
+      const result = await pool.query('SELECT name FROM universities WHERE slug = $1', [slug])
+      const name = result.rows[0]?.name || slug
+      return res.json({ ok: true, role: 'subuser', university: slug, universityName: name })
+    } catch {
+      return res.json({ ok: true, role: 'subuser', university: slug, universityName: slug })
+    }
   }
   res.status(401).json({ error: 'Unauthorized' })
 })
