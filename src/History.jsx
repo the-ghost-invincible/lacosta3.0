@@ -75,6 +75,7 @@ export function HistoryPage() {
       const res = await fetch(`/api/orders/${orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status: 'canceled' }),
       })
       if (res.ok) {

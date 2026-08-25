@@ -134,6 +134,20 @@ orderRouter.get('/mine', requireUser, async (req, res) => {
   }
 })
 
+// Cancel own order (user)
+orderRouter.put('/:id/status', requireUser, async (req, res) => {
+  const { status } = req.body ?? {}
+  if (status !== 'canceled') {
+    return res.status(400).json({ error: 'Users can only cancel orders' })
+  }
+  const result = await pool.query(
+    'UPDATE orders SET status = $1 WHERE id = $2 AND user_id = $3 AND status IN ($4, $5) RETURNING *',
+    [status, req.params.id, req.user.id, 'pending', 'confirmed']
+  )
+  if (result.rowCount === 0) return res.status(404).json({ error: 'Order not found or cannot be canceled' })
+  res.json({ ok: true, order: result.rows[0] })
+})
+
 export const orderAdminRouter = Router()
 
 // Every registered user exactly once, with their live cart (admin).

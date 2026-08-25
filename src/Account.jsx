@@ -23,6 +23,21 @@ export function AccountPage() {
     }
   }, [user])
 
+  const cancelOrder = async (orderId) => {
+    if (!confirm('Cancel this order?')) return
+    try {
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'canceled' }),
+      })
+      if (res.ok) {
+        setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'canceled' } : o))
+      }
+    } catch {}
+  }
+
   if (loading) {
     return (
       <div className="page-shell">
@@ -126,6 +141,9 @@ export function AccountPage() {
                       <span className={`status-badge payment-${order.payment_status ?? 'pending'}`}>
                         {PAYMENT_LABELS[order.payment_status ?? 'pending'] ?? order.payment_status}
                       </span>
+                      {order.status !== 'canceled' && order.status !== 'delivered' && (
+                        <button type="button" className="btn danger small" onClick={() => cancelOrder(order.id)}>Cancel</button>
+                      )}
                     </div>
                   </div>
                   <div className="order-history-items">
