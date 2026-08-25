@@ -511,9 +511,12 @@ function Dashboard({ role, uniSlug, onLogout, theme, onToggleTheme }) {
   return (
     <div className="admin-shell">
       <header className="admin-bar">
-        <div className="admin-brand">
-          <h1>Lacosta Admin</h1>
-          <small>{role === 'subuser' ? (universities.find((u) => u.slug === uniSlug)?.name || uniSlug) : 'Manage your store'}</small>
+        <div className="admin-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <img src="/logo.png" alt="Lacosta" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'contain' }} />
+          <div>
+            <h1>Lacosta Admin</h1>
+            <small>{role === 'subuser' ? (universities.find((u) => u.slug === uniSlug)?.name || uniSlug) : 'Manage your store'}</small>
+          </div>
         </div>
         <div className="admin-bar-actions">
           {role === 'subuser' && (
