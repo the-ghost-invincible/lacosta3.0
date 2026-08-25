@@ -16,6 +16,21 @@ import { paymentRouter } from './payment-routes.js'
 import { errorHandler } from './error-tracker.js'
 import { seoRouter } from './seo.js'
 
+// Password hashing for university passwords (scrypt, same as auth.js)
+const keylen = 64
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex')
+  const hash = crypto.scryptSync(password, salt, keylen).toString('hex')
+  return `${salt}:${hash}`
+}
+function verifyPassword(password, stored) {
+  const [salt, hash] = String(stored ?? '').split(':')
+  if (!salt || !hash) return false
+  const candidate = crypto.scryptSync(password, salt, keylen)
+  const expected = Buffer.from(hash, 'hex')
+  return candidate.length === expected.length && crypto.timingSafeEqual(candidate, expected)
+}
+
 const root = path.resolve(import.meta.dirname, '..')
 const dataFile = path.join(import.meta.dirname, 'data.json')
 const uploadsDir = path.join(root, 'public', 'uploads')
@@ -204,7 +219,7 @@ app.get('/api/data', async (req, res) => {
 // ---------- Universities ----------
 app.get('/api/universities', async (_req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM universities ORDER BY name')
+    const result = await pool.query('SELECT id, name, slug, created_at, (password_hash IS NOT NULL) AS "hasPassword" FROM universities ORDER BY name')
     res.json({ universities: result.rows })
   } catch {
     res.json({ universities: [] })
@@ -263,13 +278,18 @@ app.get('/api/stock/reserved', async (req, res) => {
 
 // ---------- Orders ----------
 app.use('/api/orders', orderRouter)
-app.get('/api/admin/customers', requireAuth, getCustomers)
-app.use('/api/admin/orders', requireAuth, orderAdminRouter)
+app.get('/api/admin/customers', requireAnyAdmin, getCustomers)
+app.use('/api/admin/orders', requireAnyAdmin, orderAdminRouter)
 
 // ---------- Admin: data for specific university ----------
-app.get('/api/admin/data', requireAuth, async (req, res) => {
+app.get('/api/admin/data', requireAnyAdmin, async (req, res) => {
   const university = req.query.university || null
-  const data = await readData(university)
+  if (req.adminRole === 'subuser') {
+    if (university && university !== req.adminUniversity) {
+      return res.status(403).json({ error: 'Access denied' })
+    }
+  }
+  const data = await readData(req.adminRole === 'subuser' ? req.adminUniversity : university)
   res.json(data)
 })
 
@@ -302,22 +322,92 @@ app.post('/api/logout', (_req, res) => {
 })
 
 app.get('/api/admin/me', (req, res) => {
-  if (sessions.has(req.cookies.adminToken)) return res.json({ ok: true })
+  if (sessions.has(req.cookies.adminToken)) return res.json({ ok: true, role: 'superuser' })
+  if (req.cookies.uniAdminToken && uniSessions.has(req.cookies.uniAdminToken)) {
+    return res.json({ ok: true, role: 'subuser', university: req.cookies.uniAdminUniversity })
+  }
   res.status(401).json({ error: 'Unauthorized' })
 })
 
-// ---------- Admin: data ----------
-app.put('/api/admin/data', requireAuth, async (req, res) => {
+// ---------- University sub-user sessions ----------
+const uniSessions = new Set()
+
+// ---------- University sub-user login ----------
+app.post('/api/uni-login', authLimiter, async (req, res) => {
+  const { slug, password } = req.body ?? {}
+  if (!slug || !password) return res.status(400).json({ error: 'University and password required' })
+
+  const result = await pool.query('SELECT * FROM universities WHERE slug = $1', [slug])
+  const uni = result.rows[0]
+  if (!uni) return res.status(401).json({ error: 'University not found' })
+
+  if (uni.password_hash) {
+    if (!verifyPassword(password, uni.password_hash)) {
+      return res.status(401).json({ error: 'Wrong password' })
+    }
+  }
+
+  const token = crypto.randomBytes(24).toString('hex')
+  uniSessions.add(token)
+  res.cookie('uniAdminToken', token, {
+    httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000,
+  })
+  res.cookie('uniAdminUniversity', slug, {
+    httpOnly: false, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000,
+  })
+  res.json({ ok: true, university: slug })
+})
+
+app.post('/api/uni-logout', (req, res) => {
+  const token = req.cookies.uniAdminToken
+  if (token) uniSessions.delete(token)
+  res.clearCookie('uniAdminToken')
+  res.clearCookie('uniAdminUniversity')
+  res.json({ ok: true })
+})
+
+// Middleware: accept both admin (superuser) and sub-user tokens
+function requireAnyAdmin(req, res, next) {
+  if (sessions.has(req.cookies.adminToken)) {
+    req.adminRole = 'superuser'
+    return next()
+  }
+  if (req.cookies.uniAdminToken && uniSessions.has(req.cookies.uniAdminToken)) {
+    req.adminRole = 'subuser'
+    req.adminUniversity = req.cookies.uniAdminUniversity
+    return next()
+  }
+  res.status(401).json({ error: 'Unauthorized' })
+}
+
+// ---------- Super user password verify ----------
+app.post('/api/admin/verify-superuser', requireAnyAdmin, (req, res) => {
+  const { password } = req.body ?? {}
+  if (password === config.superUserPassword) {
+    res.json({ ok: true })
+  } else {
+    res.status(403).json({ error: 'Wrong super user password' })
+  }
+})
+
+// ---------- Admin: data (accepts sub-user with university filter) ----------
+app.put('/api/admin/data', requireAnyAdmin, async (req, res) => {
   const { section, value, university } = req.body ?? {}
   if (!SECTIONS.includes(section)) return res.status(400).json({ error: 'Unknown section' })
+  if (req.adminRole === 'subuser') {
+    if (university !== req.adminUniversity) return res.status(403).json({ error: 'Access denied' })
+  }
   await writeSection(section, value, university)
   res.json({ ok: true })
 })
 
 // ---------- Admin: products ----------
-app.post('/api/admin/products', requireAuth, async (req, res) => {
+app.post('/api/admin/products', requireAnyAdmin, async (req, res) => {
   try {
     const product = req.body ?? {}
+    if (req.adminRole === 'subuser') {
+      product.university = req.adminUniversity
+    }
     const result = await writeProduct(product)
     res.json({ ok: true, product: result })
   } catch (err) {
@@ -325,10 +415,13 @@ app.post('/api/admin/products', requireAuth, async (req, res) => {
   }
 })
 
-app.put('/api/admin/products', requireAuth, async (req, res) => {
+app.put('/api/admin/products', requireAnyAdmin, async (req, res) => {
   try {
     const product = req.body ?? {}
     if (!product.id) return res.status(400).json({ error: 'Product id is required' })
+    if (req.adminRole === 'subuser') {
+      product.university = req.adminUniversity
+    }
     const result = await writeProduct(product)
     res.json({ ok: true, product: result })
   } catch (err) {
@@ -336,7 +429,7 @@ app.put('/api/admin/products', requireAuth, async (req, res) => {
   }
 })
 
-app.delete('/api/admin/products/:id', requireAuth, async (req, res) => {
+app.delete('/api/admin/products/:id', requireAnyAdmin, async (req, res) => {
   try {
     await pool.query('UPDATE products SET active = false WHERE id = $1', [req.params.id])
     siteDataCache = null
@@ -346,10 +439,10 @@ app.delete('/api/admin/products/:id', requireAuth, async (req, res) => {
   }
 })
 
-// ---------- Admin: universities ----------
+// ---------- Admin: universities (superuser only for create/delete/password) ----------
 app.post('/api/admin/universities', requireAuth, async (req, res) => {
   try {
-    const { name } = req.body ?? {}
+    const { name, password } = req.body ?? {}
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'University name is required' })
     }
@@ -360,9 +453,10 @@ app.post('/api/admin/universities', requireAuth, async (req, res) => {
       return res.status(409).json({ error: 'A university with that name already exists' })
     }
 
+    const pwHash = password ? hashPassword(password) : null
     const result = await pool.query(
-      'INSERT INTO universities (name, slug) VALUES ($1, $2) RETURNING *',
-      [name.trim(), slug]
+      'INSERT INTO universities (name, slug, password_hash) VALUES ($1, $2, $3) RETURNING id, name, slug, created_at',
+      [name.trim(), slug, pwHash]
     )
     const uni = result.rows[0]
 

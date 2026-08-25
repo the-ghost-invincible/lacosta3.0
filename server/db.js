@@ -151,6 +151,8 @@ export async function initDb() {
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS out_of_stock BOOLEAN NOT NULL DEFAULT false")
   // Quantity/inventory migration
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 0")
+  // University password migration
+  await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS password_hash TEXT")
   // University column on products
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS university TEXT")
   // Sync out_of_stock flag with quantity

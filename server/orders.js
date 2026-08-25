@@ -280,8 +280,16 @@ orderAdminRouter.delete('/user/:id', async (req, res) => {
   res.json({ ok: true, deleted: result.rows[0] })
 })
 
-// Delete an order permanently (admin)
+// Delete an order permanently (admin, requires superuser password)
 orderAdminRouter.delete('/:id', async (req, res) => {
+  const password = String(req.body?.password ?? '')
+  if (!password) return res.status(400).json({ error: 'Super user password required' })
+
+  const { config } = await import('./config.js')
+  if (password !== config.superUserPassword) {
+    return res.status(403).json({ error: 'Wrong super user password' })
+  }
+
   const result = await pool.query('DELETE FROM orders WHERE id = $1 RETURNING id', [
     req.params.id,
   ])

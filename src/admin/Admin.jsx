@@ -20,6 +20,8 @@ async function api(path, options = {}) {
 
 export function AdminPage() {
   const [authed, setAuthed] = useState(null)
+  const [role, setRole] = useState(null)
+  const [uniSlug, setUniSlug] = useState(null)
   const [theme, setTheme] = useState(() => localStorage.getItem('lacosta-theme') || 'light')
 
   useEffect(() => {
@@ -29,7 +31,14 @@ export function AdminPage() {
 
   useEffect(() => {
     api('/api/admin/me')
-      .then((res) => setAuthed(res.ok))
+      .then((res) => {
+        if (!res.ok) return setAuthed(false)
+        return res.json().then((data) => {
+          setAuthed(true)
+          setRole(data.role ?? 'superuser')
+          setUniSlug(data.university ?? null)
+        })
+      })
       .catch(() => setAuthed(false))
   }, [])
 
@@ -41,10 +50,12 @@ export function AdminPage() {
     )
   }
 
-  if (!authed) return <Login onLogin={() => setAuthed(true)} />
+  if (!authed) return <Login onLogin={(r, slug) => { setAuthed(true); setRole(r); setUniSlug(slug) }} />
 
   return (
     <Dashboard
+      role={role}
+      uniSlug={uniSlug}
       onLogout={() => setAuthed(false)}
       theme={theme}
       onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -53,34 +64,91 @@ export function AdminPage() {
 }
 
 function Login({ onLogin }) {
+  const [loginMode, setLoginMode] = useState('admin')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [uniList, setUniList] = useState([])
+  const [selectedUniSlug, setSelectedUniSlug] = useState('')
+
+  useEffect(() => {
+    if (loginMode === 'university') {
+      api('/api/universities')
+        .then((res) => res.json())
+        .then((data) => setUniList(data.universities ?? []))
+        .catch(() => {})
+    }
+  }, [loginMode])
 
   const submit = async (e) => {
     e.preventDefault()
     setBusy(true)
     setError('')
-    const res = await api('/api/login', {
-      method: 'POST',
-      body: JSON.stringify({ password }),
-    })
-    setBusy(false)
-    if (res.ok) onLogin()
-    else setError('Wrong password')
+    if (loginMode === 'admin') {
+      const res = await api('/api/login', {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      })
+      setBusy(false)
+      if (res.ok) onLogin('superuser', null)
+      else setError('Wrong password')
+    } else {
+      if (!selectedUniSlug) {
+        setBusy(false)
+        return setError('Select a university')
+      }
+      const res = await api('/api/uni-login', {
+        method: 'POST',
+        body: JSON.stringify({ slug: selectedUniSlug, password }),
+      })
+      setBusy(false)
+      if (res.ok) onLogin('subuser', selectedUniSlug)
+      else setError('Wrong password or invalid university')
+    }
   }
 
   return (
     <div className="admin-login">
       <form className="admin-login-card" onSubmit={submit}>
         <h1>Lacosta Admin</h1>
-        <p>Enter the admin password to manage your store.</p>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <button
+            type="button"
+            className={`btn ${loginMode === 'admin' ? '' : 'ghost'}`}
+            style={{ flex: 1 }}
+            onClick={() => { setLoginMode('admin'); setPassword(''); setError('') }}
+          >
+            Admin Login
+          </button>
+          <button
+            type="button"
+            className={`btn ${loginMode === 'university' ? '' : 'ghost'}`}
+            style={{ flex: 1 }}
+            onClick={() => { setLoginMode('university'); setPassword(''); setError('') }}
+          >
+            University Login
+          </button>
+        </div>
+        {loginMode === 'university' && (
+          <select
+            value={selectedUniSlug}
+            onChange={(e) => setSelectedUniSlug(e.target.value)}
+            style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--adm-border)', marginBottom: '0.75rem' }}
+            autoFocus
+          >
+            <option value="">— Select university —</option>
+            {uniList.map((u) => (
+              <option key={u.slug} value={u.slug}>{u.name}</option>
+            ))}
+          </select>
+        )}
+        <p>{loginMode === 'admin' ? 'Enter the admin password to manage your store.' : 'Enter your university admin password.'}</p>
         <input
           type="password"
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          autoFocus
+          autoFocus={loginMode === 'admin'}
         />
         {error && <p className="error">{error}</p>}
         <button type="submit" className="btn" disabled={busy} style={{ width: '100%' }}>
@@ -91,17 +159,164 @@ function Login({ onLogin }) {
   )
 }
 
-function Dashboard({ onLogout, theme, onToggleTheme }) {
+function SuperuserPasswordPrompt({ open, onClose, onVerified }) {
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (open) { setPassword(''); setError('') }
+  }, [open])
+
+  if (!open) return null
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      const res = await api('/api/admin/verify-superuser', {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      })
+      setBusy(false)
+      if (res.ok) {
+        onVerified(true)
+        onClose()
+      } else {
+        setError('Wrong password')
+      }
+    } catch {
+      setBusy(false)
+      setError('Network error')
+    }
+  }
+
+  return (
+    <div className="admin-modal-overlay" onClick={onClose}>
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Superuser Verification</h2>
+        <p>Enter the superuser password to continue.</p>
+        <form onSubmit={submit}>
+          <label className="form-field">
+            <span>Superuser password</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Superuser password"
+              autoFocus
+            />
+          </label>
+          {error && <p className="error">{error}</p>}
+          <div className="form-actions">
+            <button type="button" className="btn ghost" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn" disabled={busy || !password}>
+              {busy ? 'Verifying…' : 'Verify'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function ChangePasswordModal({ open, onClose, universitySlug }) {
+  const [step, setStep] = useState('verify')
+  const [newPassword, setNewPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  useEffect(() => {
+    if (open) { setStep('verify'); setNewPassword(''); setError(''); setSuccess(false) }
+  }, [open])
+
+  if (!open) return null
+
+  const handleVerified = async () => {
+    setStep('newpassword')
+  }
+
+  const changePassword = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      const res = await api(`/api/admin/universities/${universitySlug}/password`, {
+        method: 'PUT',
+        body: JSON.stringify({ password: newPassword }),
+      })
+      setBusy(false)
+      if (res.ok) {
+        setSuccess(true)
+        setTimeout(onClose, 1500)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error ?? 'Failed to change password')
+      }
+    } catch {
+      setBusy(false)
+      setError('Network error')
+    }
+  }
+
+  return (
+    <>
+      <SuperuserPasswordPrompt
+        open={step === 'verify'}
+        onClose={onClose}
+        onVerified={handleVerified}
+      />
+      {step === 'newpassword' && (
+        <div className="admin-modal-overlay" onClick={onClose}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Change University Password</h2>
+            <p>Enter the new password for this university admin.</p>
+            {success ? (
+              <p style={{ color: '#16a34a', fontWeight: 600 }}>Password changed successfully!</p>
+            ) : (
+              <form onSubmit={changePassword}>
+                <label className="form-field">
+                  <span>New password</span>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="New password"
+                    autoFocus
+                  />
+                </label>
+                {error && <p className="error">{error}</p>}
+                <div className="form-actions">
+                  <button type="button" className="btn ghost" onClick={onClose}>Cancel</button>
+                  <button type="submit" className="btn" disabled={busy || !newPassword}>
+                    {busy ? 'Saving…' : 'Save new password'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function Dashboard({ role, uniSlug, onLogout, theme, onToggleTheme }) {
   const [db, setDb] = useState(null)
-  const [tab, setTab] = useState('products')
+  const [tab, setTab] = useState(role === 'subuser' ? 'orders' : 'products')
   const [msg, setMsg] = useState(null)
   const [ngrokUrl, setNgrokUrl] = useState(null)
   const [copied, setCopied] = useState(false)
   const [universities, setUniversities] = useState([])
-  const [selectedUni, setSelectedUni] = useState(null)
+  const [selectedUni, setSelectedUni] = useState(uniSlug ?? null)
   const [showAddUni, setShowAddUni] = useState(false)
   const [newUniName, setNewUniName] = useState('')
   const [newUniBusy, setNewUniBusy] = useState(false)
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [deleteOrderTarget, setDeleteOrderTarget] = useState(null)
+  const [showDeleteUniPrompt, setShowDeleteUniPrompt] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -109,7 +324,9 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
     api('/api/universities').then((res) => res.json()).then((data) => {
       const list = data.universities ?? []
       setUniversities(list)
-      if (!selectedUni && list.length > 0) {
+      if (role === 'subuser') {
+        setSelectedUni(uniSlug)
+      } else if (!selectedUni && list.length > 0) {
         setSelectedUni(list[0].slug)
       }
     }).catch(() => {})
@@ -180,10 +397,12 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
     setNewUniBusy(false)
   }
 
-  const deleteUniversity = async (slug) => {
-    if (!confirm(`Delete university "${slug}"? This will remove all its products and data.`)) return
+  const deleteUniversity = async (slug, superuserPassword) => {
     try {
-      const res = await api(`/api/admin/universities/${slug}`, { method: 'DELETE' })
+      const res = await api(`/api/admin/universities/${slug}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ password: superuserPassword }),
+      })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         flash('University deleted')
@@ -235,7 +454,11 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
   }
 
   const logout = async () => {
-    await api('/api/logout', { method: 'POST' })
+    if (role === 'subuser') {
+      await api('/api/uni-logout', { method: 'POST' })
+    } else {
+      await api('/api/logout', { method: 'POST' })
+    }
     onLogout()
   }
 
@@ -266,7 +489,7 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
     </div>
   )
 
-  const tabs = [
+  const allTabs = [
     { id: 'products', label: 'Products' },
     { id: 'customers', label: 'Customers' },
     { id: 'orders', label: 'Orders' },
@@ -275,6 +498,7 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
     { id: 'menus', label: 'Subcategories' },
     { id: 'content', label: 'Site content' },
   ]
+  const tabs = role === 'subuser' ? allTabs.filter((t) => t.id === 'orders') : allTabs
 
   return (
     <div className="admin-shell">
@@ -284,6 +508,11 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
           <small>Manage your store</small>
         </div>
         <div className="admin-bar-actions">
+          {role === 'subuser' && (
+            <button type="button" className="btn ghost small" onClick={() => setShowChangePassword(true)}>
+              Change Password
+            </button>
+          )}
           <a
             href="https://lacostamarkets.site"
             target="_blank"
@@ -306,6 +535,7 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
         </div>
       </header>
 
+      {role === 'superuser' && (
       <div className="admin-university-bar">
         <div className="uni-selector">
           <label>University:</label>
@@ -319,8 +549,13 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
             ))}
           </select>
           {selectedUni && (
-            <button type="button" className="btn danger small" onClick={() => deleteUniversity(selectedUni)}>
+            <button type="button" className="btn danger small" onClick={() => setShowDeleteUniPrompt(true)}>
               Delete
+            </button>
+          )}
+          {selectedUni && (
+            <button type="button" className="btn small" onClick={() => setShowChangePassword(true)}>
+              Change Password
             </button>
           )}
         </div>
@@ -328,6 +563,7 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
           + Add University
         </button>
       </div>
+      )}
 
       {showAddUni && (
         <div className="admin-modal-overlay" onClick={() => setShowAddUni(false)}>
@@ -391,7 +627,7 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
               <CustomersTab university={selectedUni} />
             )}
             {tab === 'orders' && (
-              <OrdersTab university={selectedUni} />
+              <OrdersTab university={selectedUni} role={role} />
             )}
             {tab === 'featured' && (
               <FeaturedTab products={db.featuredProducts} categories={db.categories} onSave={(v) => save('featuredProducts', v)} />
@@ -419,6 +655,18 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
           </>
         )}
       </main>
+
+      <SuperuserPasswordPrompt
+        open={showDeleteUniPrompt}
+        onClose={() => setShowDeleteUniPrompt(false)}
+        onVerified={(ok) => { if (ok) deleteUniversity(selectedUni) }}
+      />
+
+      <ChangePasswordModal
+        open={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+        universitySlug={selectedUni}
+      />
 
       {msg && <div className="toast">{msg}</div>}
     </div>
@@ -791,11 +1039,12 @@ function CustomersTab({ university }) {
   )
 }
 
-function OrdersTab({ university }) {
+function OrdersTab({ university, role }) {
   const [orders, setOrders] = useState([])
   const [busyId, setBusyId] = useState(null)
   const [selected, setSelected] = useState([])
   const [viewOrder, setViewOrder] = useState(null)
+  const [deleteOrderPrompt, setDeleteOrderPrompt] = useState(null)
 
   const load = () => {
     api(`/api/admin/orders?university=${encodeURIComponent(university ?? '')}`)
@@ -830,10 +1079,12 @@ function OrdersTab({ university }) {
     if (res.ok) load()
   }
 
-  const removeOrder = async (id) => {
-    if (!confirm('Delete this order permanently?')) return
+  const removeOrder = async (id, password) => {
     setBusyId(id)
-    const res = await api(`/api/admin/orders/${id}`, { method: 'DELETE' })
+    const res = await api(`/api/admin/orders/${id}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ password }),
+    })
     setBusyId(null)
     if (res.ok) {
       if (viewOrder?.id === id) setViewOrder(null)
@@ -1034,7 +1285,7 @@ function OrdersTab({ university }) {
                       className="btn danger small"
                       disabled={busyId === order.id}
                       title="Remove from this list"
-                      onClick={() => removeOrder(order.id)}
+                      onClick={() => setDeleteOrderPrompt(order)}
                     >
                       ✕
                     </button>
@@ -1118,6 +1369,12 @@ function OrdersTab({ university }) {
           </div>
         </div>
       )}
+
+      <SuperuserPasswordPrompt
+        open={deleteOrderPrompt !== null}
+        onClose={() => setDeleteOrderPrompt(null)}
+        onVerified={(ok) => { if (ok && deleteOrderPrompt) removeOrder(deleteOrderPrompt.id); setDeleteOrderPrompt(null) }}
+      />
     </div>
   )
 }
