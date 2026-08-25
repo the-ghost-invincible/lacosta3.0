@@ -97,22 +97,44 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
   const [msg, setMsg] = useState(null)
   const [ngrokUrl, setNgrokUrl] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [universities, setUniversities] = useState([])
+  const [selectedUni, setSelectedUni] = useState(null)
+  const [showAddUni, setShowAddUni] = useState(false)
+  const [newUniName, setNewUniName] = useState('')
+  const [newUniBusy, setNewUniBusy] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
 
+  const loadUniversities = () => {
+    api('/api/universities').then((res) => res.json()).then((data) => {
+      const list = data.universities ?? []
+      setUniversities(list)
+      if (!selectedUni && list.length > 0) {
+        setSelectedUni(list[0].slug)
+      }
+    }).catch(() => {})
+  }
+
   useEffect(() => {
-    api('/api/data').then((res) => res.json()).then(setDb).catch(() => {})
+    loadUniversities()
     api('/api/admin/ngrok').then((res) => res.json()).then((d) => setNgrokUrl(d.url)).catch(() => {})
   }, [])
 
-  // Auto-refresh product data every 10s so quantity changes show immediately
+  const loadData = () => {
+    if (!selectedUni) return
+    api(`/api/admin/data?university=${encodeURIComponent(selectedUni)}`).then((res) => res.json()).then(setDb).catch(() => {})
+  }
+
   useEffect(() => {
-    if (tab !== 'products') return
-    const interval = setInterval(() => {
-      api('/api/data').then((res) => res.json()).then(setDb).catch(() => {})
-    }, 10000)
+    loadData()
+  }, [selectedUni])
+
+  // Auto-refresh product data every 10s
+  useEffect(() => {
+    if (tab !== 'products' || !selectedUni) return
+    const interval = setInterval(loadData, 10000)
     return () => clearInterval(interval)
-  }, [tab])
+  }, [tab, selectedUni])
 
   const flash = (text) => {
     setMsg(text)
@@ -122,7 +144,7 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
   const save = async (section, value) => {
     const res = await api('/api/admin/data', {
       method: 'PUT',
-      body: JSON.stringify({ section, value }),
+      body: JSON.stringify({ section, value, university: selectedUni }),
     })
     if (res.ok) {
       setDb((prev) => ({ ...prev, [section]: value }))
@@ -132,14 +154,55 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
     }
   }
 
-  // Full-page product editor routes:
-  // /admin-7f3k9/products/new          -> create a product
-  // /admin-7f3k9/products/:id/edit     -> edit an existing product
+  const addUniversity = async () => {
+    if (!newUniName.trim()) return
+    setNewUniBusy(true)
+    try {
+      const res = await api('/api/admin/universities', {
+        method: 'POST',
+        body: JSON.stringify({ name: newUniName.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        flash('University created')
+        setNewUniName('')
+        setShowAddUni(false)
+        loadUniversities()
+        if (data.university) {
+          setSelectedUni(data.university.slug)
+        }
+      } else {
+        flash(data.error ?? 'Failed to create university')
+      }
+    } catch {
+      flash('Failed to create university')
+    }
+    setNewUniBusy(false)
+  }
+
+  const deleteUniversity = async (slug) => {
+    if (!confirm(`Delete university "${slug}"? This will remove all its products and data.`)) return
+    try {
+      const res = await api(`/api/admin/universities/${slug}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        flash('University deleted')
+        setSelectedUni(null)
+        loadUniversities()
+      } else {
+        flash(data.error ?? 'Failed to delete university')
+      }
+    } catch {
+      flash('Failed to delete university')
+    }
+  }
+
+  // Full-page product editor routes
   const isNewProduct = location.pathname === `${ADMIN_PATH}/products/new`
   const editMatch = location.pathname.match(/\/products\/(\d+)\/edit$/)
   const editProductId = editMatch ? Number(editMatch[1]) : null
   const editingProduct = isNewProduct
-    ? { ...emptyProduct(), category: db?.categories?.find((c) => c.name !== 'All')?.name ?? '' }
+    ? { ...emptyProduct(), category: db?.categories?.find((c) => c.name !== 'All')?.name ?? '', university: selectedUni }
     : editProductId != null
       ? (db?.catalogProducts ?? []).find((p) => Number(p.id) === editProductId) ?? null
       : null
@@ -147,9 +210,10 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
 
   const saveProduct = async (product) => {
     try {
+      const toSave = { ...product, university: selectedUni }
       const res = await api('/api/admin/products', {
         method: product.id ? 'PUT' : 'POST',
-        body: JSON.stringify(product),
+        body: JSON.stringify(toSave),
       })
       if (res.ok) {
         const data = await res.json()
@@ -217,6 +281,53 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
         </div>
       </header>
 
+      <div className="admin-university-bar">
+        <div className="uni-selector">
+          <label>University:</label>
+          <select
+            value={selectedUni ?? ''}
+            onChange={(e) => setSelectedUni(e.target.value)}
+          >
+            {universities.length === 0 && <option value="">— none —</option>}
+            {universities.map((u) => (
+              <option key={u.slug} value={u.slug}>{u.name}</option>
+            ))}
+          </select>
+          {selectedUni && (
+            <button type="button" className="btn danger small" onClick={() => deleteUniversity(selectedUni)}>
+              Delete
+            </button>
+          )}
+        </div>
+        <button type="button" className="btn small" onClick={() => setShowAddUni(true)}>
+          + Add University
+        </button>
+      </div>
+
+      {showAddUni && (
+        <div className="admin-modal-overlay" onClick={() => setShowAddUni(false)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Add University</h2>
+            <p>Enter the name for the new university. This will create a separate product catalog.</p>
+            <label className="form-field">
+              <span>University name</span>
+              <input
+                value={newUniName}
+                onChange={(e) => setNewUniName(e.target.value)}
+                placeholder="e.g. University of Nairobi"
+                autoFocus
+              />
+            </label>
+            <div className="form-actions">
+              <button type="button" className="btn ghost" onClick={() => setShowAddUni(false)}>Cancel</button>
+              <button type="button" className="btn" disabled={newUniBusy || !newUniName.trim()} onClick={addUniversity}>
+                {newUniBusy ? 'Creating…' : 'Create university'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <nav className="admin-tabs">
         {tabs.map((t) => (
           <button
@@ -231,7 +342,12 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
       </nav>
 
       <main className="admin-content">
-        {onProductEditor ? (
+        {!selectedUni ? (
+          <div className="admin-panel">
+            <h2>Select a University</h2>
+            <p className="panel-hint">Choose a university from the dropdown above to manage its products, orders, and content. Or add a new university to get started.</p>
+          </div>
+        ) : onProductEditor ? (
           <ProductForm
             initial={editingProduct}
             categories={db.categories}
@@ -247,10 +363,10 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
               <ProductsTab products={db.catalogProducts} onSave={(v) => save('catalogProducts', v)} />
             )}
             {tab === 'customers' && (
-              <CustomersTab />
+              <CustomersTab university={selectedUni} />
             )}
             {tab === 'orders' && (
-              <OrdersTab />
+              <OrdersTab university={selectedUni} />
             )}
             {tab === 'featured' && (
               <FeaturedTab products={db.featuredProducts} categories={db.categories} onSave={(v) => save('featuredProducts', v)} />
@@ -497,7 +613,7 @@ function ProductsTab({ products, onSave }) {
 const STATUS_LABELS = { pending: 'Pending', confirmed: 'Confirmed', canceled: 'Canceled', delivered: 'Delivered' }
 const PAYMENT_STATUS_LABELS = { pending: 'Unpaid', paid: 'Paid', failed: 'Failed' }
 
-function CustomersTab() {
+function CustomersTab({ university }) {
   const [customers, setCustomers] = useState([])
   const [refreshing, setRefreshing] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -508,7 +624,7 @@ function CustomersTab() {
   const load = async () => {
     setRefreshing(true)
     try {
-      const res = await api('/api/admin/customers')
+      const res = await api(`/api/admin/customers?university=${encodeURIComponent(university ?? '')}`)
       const data = await res.json()
       setCustomers(data.customers ?? [])
     } catch {
@@ -521,7 +637,7 @@ function CustomersTab() {
     load()
     const id = setInterval(load, 15000)
     return () => clearInterval(id)
-  }, [])
+  }, [university])
 
   const deleteUser = async () => {
     if (!deleteTarget) return
@@ -650,14 +766,14 @@ function CustomersTab() {
   )
 }
 
-function OrdersTab() {
+function OrdersTab({ university }) {
   const [orders, setOrders] = useState([])
   const [busyId, setBusyId] = useState(null)
   const [selected, setSelected] = useState([])
   const [viewOrder, setViewOrder] = useState(null)
 
   const load = () => {
-    api('/api/admin/orders')
+    api(`/api/admin/orders?university=${encodeURIComponent(university ?? '')}`)
       .then((res) => res.json())
       .then((d) => setOrders(d.orders ?? []))
       .catch(() => {})
@@ -667,7 +783,7 @@ function OrdersTab() {
     load()
     const id = setInterval(load, 15000)
     return () => clearInterval(id)
-  }, [])
+  }, [university])
 
   const setStatus = async (id, status) => {
     setBusyId(id)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Header } from './Header'
 import { useAuth } from './AuthContext'
@@ -11,12 +11,21 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [university, setUniversity] = useState('')
+  const [universities, setUniversities] = useState([])
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
   const [busy, setBusy] = useState(false)
   const [needsVerify, setNeedsVerify] = useState(false)
   const [resendMsg, setResendMsg] = useState(null)
   const [resendBusy, setResendBusy] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/universities')
+      .then((res) => res.json())
+      .then((data) => setUniversities(data.universities ?? []))
+      .catch(() => {})
+  }, [])
 
   const submit = async (e) => {
     e.preventDefault()
@@ -27,6 +36,11 @@ export function LoginPage() {
 
     if (mode === 'register' && password !== confirm) {
       setError('Passwords do not match')
+      return
+    }
+
+    if (mode === 'register' && !university) {
+      setError('Please select a university')
       return
     }
 
@@ -41,13 +55,14 @@ export function LoginPage() {
         setError(err)
       } else navigate('/account')
     } else {
-      const err = await register(email, password)
+      const err = await register(email, password, university)
       setBusy(false)
       if (err) setError(err)
       else {
         setNotice('Account created! Check your email to verify your account, then log in.')
         setPassword('')
         setConfirm('')
+        setUniversity('')
         setMode('login')
       }
     }
@@ -78,6 +93,7 @@ export function LoginPage() {
     setResendMsg(null)
     setPassword('')
     setConfirm('')
+    setUniversity('')
   }
 
   return (
@@ -143,16 +159,32 @@ export function LoginPage() {
             )}
 
             {mode === 'register' && (
-              <label className="form-field">
-                <span>Confirm password</span>
-                <input
-                  type="password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  placeholder="Repeat your password"
-                  required
-                />
-              </label>
+              <>
+                <label className="form-field">
+                  <span>University</span>
+                  <select
+                    value={university}
+                    onChange={(e) => setUniversity(e.target.value)}
+                    required
+                  >
+                    <option value="">— select your university —</option>
+                    {universities.map((uni) => (
+                      <option key={uni.slug} value={uni.slug}>{uni.name}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="form-field">
+                  <span>Confirm password</span>
+                  <input
+                    type="password"
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                    placeholder="Repeat your password"
+                    required
+                  />
+                </label>
+              </>
             )}
 
             <button type="submit" className="primary-btn auth-submit" disabled={busy}>

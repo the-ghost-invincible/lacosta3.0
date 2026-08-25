@@ -9,7 +9,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { config } from './config.js'
 import { initDb, pool } from './db.js'
-import { authRouter } from './auth.js'
+import { authRouter, userFromSession } from './auth.js'
 import { cartRouter } from './cart.js'
 import { orderRouter, orderAdminRouter, getCustomers } from './orders.js'
 import { paymentRouter } from './payment-routes.js'
@@ -44,24 +44,30 @@ process.on('invalidate-data-cache', () => {
   siteDataCache = null
 })
 
-async function readData() {
+async function readData(university) {
   try {
-    // Try to read from database first
     const now = Date.now()
-    if (siteDataCache && now - siteDataCacheTime < SITE_CACHE_TTL) {
+    const cacheKey = university || 'default'
+    if (siteDataCache && siteDataCache._cacheKey === cacheKey && now - siteDataCacheTime < SITE_CACHE_TTL) {
       return siteDataCache
     }
 
-    // Read site data sections from database
-    const result = await pool.query('SELECT section, value FROM site_data')
+    const uniFilter = university || 'default'
+
+    // Read site data sections from database for this university
+    const result = await pool.query(
+      'SELECT section, value FROM site_data WHERE university = $1',
+      [uniFilter]
+    )
     const dbData = {}
     for (const row of result.rows) {
       dbData[row.section] = row.value
     }
 
-    // Read products from database
+    // Read products from database for this university
     const productsResult = await pool.query(
-      'SELECT * FROM products WHERE active = true ORDER BY id'
+      'SELECT * FROM products WHERE active = true AND university = $1 ORDER BY id',
+      [uniFilter]
     )
     dbData.catalogProducts = productsResult.rows.map(p => ({
       id: p.id,
@@ -83,33 +89,28 @@ async function readData() {
 
     // Merge with fallback data from JSON file
     const fallback = JSON.parse(fs.readFileSync(dataFile, 'utf8'))
-    siteDataCache = { ...fallback, ...dbData }
+    siteDataCache = { ...fallback, ...dbData, _cacheKey: cacheKey }
     siteDataCacheTime = now
     return siteDataCache
   } catch (err) {
-    // Fallback to JSON file if database is unavailable
     console.error('Database read failed, using JSON fallback:', err.message)
     return JSON.parse(fs.readFileSync(dataFile, 'utf8'))
   }
 }
 
-async function writeSection(section, value) {
+async function writeSection(section, value, university) {
+  const uni = university || 'default'
   try {
     await pool.query(
-      `INSERT INTO site_data (section, value, updated_at)
-       VALUES ($1, $2, now())
-       ON CONFLICT (section) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
-      [section, JSON.stringify(value)]
+      `INSERT INTO site_data (section, university, value, updated_at)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (section, university) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+      [section, uni, JSON.stringify(value)]
     )
-    siteDataCache = null // invalidate cache
+    siteDataCache = null
   } catch (err) {
-    // Fallback to JSON file
-    console.error('Database write failed, using JSON fallback:', err.message)
-    const data = JSON.parse(fs.readFileSync(dataFile, 'utf8'))
-    data[section] = value
-    const tmp = dataFile + '.tmp'
-    fs.writeFileSync(tmp, JSON.stringify(data, null, 2))
-    fs.renameSync(tmp, dataFile)
+    console.error('Database write failed:', err.message)
+    throw err
   }
 }
 
@@ -118,26 +119,28 @@ async function writeProduct(product) {
   try {
     await client.query('BEGIN')
     const autoOutOfStock = (product.quantity ?? 0) <= 0
+    const university = product.university || 'default'
     if (product.id) {
       await client.query(
         `UPDATE products SET name = $1, category = $2, brand = $3, subcategory = $4,
          price = $5, old_price = $6, seller = $7, rating = $8, image = $9,
-         description = $10, specs = $11, badge = $12, out_of_stock = $13, quantity = $14, updated_at = now()
-         WHERE id = $15`,
+         description = $10, specs = $11, badge = $12, out_of_stock = $13, quantity = $14,
+         university = $15, updated_at = now()
+         WHERE id = $16`,
         [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
          product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
          product.image ?? null, product.description ?? null, JSON.stringify(product.specs ?? []),
-         product.badge ?? null, autoOutOfStock, product.quantity ?? 0, product.id]
+         product.badge ?? null, autoOutOfStock, product.quantity ?? 0, university, product.id]
       )
     } else {
       const result = await client.query(
-        `INSERT INTO products (name, category, brand, subcategory, price, old_price, seller, rating, image, description, specs, badge, out_of_stock, quantity)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        `INSERT INTO products (name, category, brand, subcategory, price, old_price, seller, rating, image, description, specs, badge, out_of_stock, quantity, university)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
          RETURNING id`,
         [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
          product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
          product.image ?? null, product.description ?? null, JSON.stringify(product.specs ?? []),
-         product.badge ?? null, autoOutOfStock, product.quantity ?? 0]
+         product.badge ?? null, autoOutOfStock, product.quantity ?? 0, university]
       )
       product.id = result.rows[0].id
     }
@@ -190,9 +193,22 @@ function requireAuth(req, res, next) {
 }
 
 // ---------- Public ----------
-app.get('/api/data', async (_req, res) => {
-  const data = await readData()
+app.get('/api/data', async (req, res) => {
+  // Check if user is authenticated and has a university
+  const user = await userFromSession(req)
+  const university = user?.university || null
+  const data = await readData(university)
   res.json(data)
+})
+
+// ---------- Universities ----------
+app.get('/api/universities', async (_req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM universities ORDER BY name')
+    res.json({ universities: result.rows })
+  } catch {
+    res.json({ universities: [] })
+  }
 })
 
 // ---------- Health check ----------
@@ -212,9 +228,24 @@ app.use('/api/auth', authLimiter, authRouter)
 app.use('/api/cart', cartRouter)
 
 // ---------- Stock reservations (how many items are in all users' carts) ----------
-app.get('/api/stock/reserved', async (_req, res) => {
+app.get('/api/stock/reserved', async (req, res) => {
   try {
-    const result = await pool.query('SELECT items FROM carts')
+    // Get the requesting user's university to filter carts
+    const user = await userFromSession(req)
+    const university = user?.university
+
+    let cartQuery = 'SELECT items FROM carts'
+    let cartParams = []
+
+    // If user has a university, only count carts from users at that university
+    if (university) {
+      cartQuery = `SELECT c.items FROM carts c
+                   JOIN users u ON u.id = c.user_id
+                   WHERE u.university = $1`
+      cartParams = [university]
+    }
+
+    const result = await pool.query(cartQuery, cartParams)
     const reserved = {}
     for (const row of result.rows) {
       const items = Array.isArray(row.items) ? row.items : []
@@ -234,6 +265,13 @@ app.get('/api/stock/reserved', async (_req, res) => {
 app.use('/api/orders', orderRouter)
 app.get('/api/admin/customers', requireAuth, getCustomers)
 app.use('/api/admin/orders', requireAuth, orderAdminRouter)
+
+// ---------- Admin: data for specific university ----------
+app.get('/api/admin/data', requireAuth, async (req, res) => {
+  const university = req.query.university || null
+  const data = await readData(university)
+  res.json(data)
+})
 
 // ---------- Payments ----------
 app.use('/api/payments', paymentRouter)
@@ -270,9 +308,9 @@ app.get('/api/admin/me', (req, res) => {
 
 // ---------- Admin: data ----------
 app.put('/api/admin/data', requireAuth, async (req, res) => {
-  const { section, value } = req.body ?? {}
+  const { section, value, university } = req.body ?? {}
   if (!SECTIONS.includes(section)) return res.status(400).json({ error: 'Unknown section' })
-  await writeSection(section, value)
+  await writeSection(section, value, university)
   res.json({ ok: true })
 })
 
@@ -305,6 +343,71 @@ app.delete('/api/admin/products/:id', requireAuth, async (req, res) => {
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: err.message || 'Failed to delete product' })
+  }
+})
+
+// ---------- Admin: universities ----------
+app.post('/api/admin/universities', requireAuth, async (req, res) => {
+  try {
+    const { name } = req.body ?? {}
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'University name is required' })
+    }
+    const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
+    const existing = await pool.query('SELECT 1 FROM universities WHERE slug = $1', [slug])
+    if (existing.rowCount > 0) {
+      return res.status(409).json({ error: 'A university with that name already exists' })
+    }
+
+    const result = await pool.query(
+      'INSERT INTO universities (name, slug) VALUES ($1, $2) RETURNING *',
+      [name.trim(), slug]
+    )
+    const uni = result.rows[0]
+
+    // Create default site data for this university
+    const fallback = JSON.parse(fs.readFileSync(dataFile, 'utf8'))
+    const defaultSections = ['categories', 'deals', 'trendingProducts', 'benefits', 'siteContent', 'categoryMenus']
+    for (const section of defaultSections) {
+      if (fallback[section]) {
+        await pool.query(
+          `INSERT INTO site_data (section, university, value, updated_at)
+           VALUES ($1, $2, $3, now())
+           ON CONFLICT (section, university) DO NOTHING`,
+          [section, slug, JSON.stringify(fallback[section])]
+        )
+      }
+    }
+
+    siteDataCache = null
+    res.json({ ok: true, university: uni })
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to create university' })
+  }
+})
+
+app.delete('/api/admin/universities/:slug', requireAuth, async (req, res) => {
+  try {
+    const { slug } = req.params
+    if (slug === 'default') {
+      return res.status(400).json({ error: 'Cannot delete the default university' })
+    }
+
+    // Check if users are assigned to this university
+    const usersCheck = await pool.query('SELECT COUNT(*) FROM users WHERE university = $1', [slug])
+    if (parseInt(usersCheck.rows[0].count) > 0) {
+      return res.status(400).json({ error: 'Cannot delete university with assigned users. Reassign or remove them first.' })
+    }
+
+    await pool.query('DELETE FROM universities WHERE slug = $1', [slug])
+    await pool.query('DELETE FROM site_data WHERE university = $1', [slug])
+    await pool.query('DELETE FROM products WHERE university = $1', [slug])
+    await pool.query('DELETE FROM orders WHERE university = $1', [slug])
+    siteDataCache = null
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to delete university' })
   }
 })
 

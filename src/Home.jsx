@@ -199,7 +199,7 @@ export function Home() {
           </div>
 
           <aside className="detail-panel">
-            {(() => {
+            {currentProduct ? (() => {
               const curRemaining = (currentProduct.quantity ?? 0) - reservedQty(currentProduct.id)
               const curSoldOut = currentProduct.outOfStock || curRemaining <= 0
               return (
@@ -244,7 +244,7 @@ export function Home() {
             </div>
             </>
               )
-            })()}
+            })() : <p style={{padding:'2rem',color:'#888'}}>Select a product to view details</p>}
           </aside>
         </section>
 

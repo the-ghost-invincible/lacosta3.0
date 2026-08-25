@@ -27,6 +27,7 @@ const publicUser = (row) => ({
   avatar: row.avatar,
   phone: row.phone ?? null,
   verified: row.verified ?? true,
+  university: row.university ?? null,
 })
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -54,12 +55,22 @@ function verifyPassword(password, stored) {
 router.post('/register', async (req, res) => {
   const email = String(req.body?.email ?? '').trim().toLowerCase()
   const password = String(req.body?.password ?? '')
+  const university = String(req.body?.university ?? '').trim()
 
   if (!EMAIL_RE.test(email)) {
     return res.status(400).json({ error: 'Enter a valid email address' })
   }
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters' })
+  }
+  if (!university) {
+    return res.status(400).json({ error: 'Please select a university' })
+  }
+
+  // Verify university exists
+  const uniCheck = await pool.query('SELECT 1 FROM universities WHERE slug = $1', [university])
+  if (uniCheck.rowCount === 0) {
+    return res.status(400).json({ error: 'Invalid university selection' })
   }
 
   const existing = await pool.query('SELECT 1 FROM users WHERE LOWER(email) = LOWER($1)', [email])
@@ -68,8 +79,8 @@ router.post('/register', async (req, res) => {
   }
 
   const result = await pool.query(
-    `INSERT INTO users (email, password_hash, verified) VALUES ($1, $2, false) RETURNING *`,
-    [email, hashPassword(password)]
+    `INSERT INTO users (email, password_hash, verified, university) VALUES ($1, $2, false, $3) RETURNING *`,
+    [email, hashPassword(password), university]
   )
   const user = result.rows[0]
 

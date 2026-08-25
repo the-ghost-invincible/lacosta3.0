@@ -89,11 +89,22 @@ const PRODUCTS_TABLE = `
   )
 `
 
+const UNIVERSITIES_TABLE = `
+  CREATE TABLE IF NOT EXISTS universities (
+    id BIGSERIAL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    slug TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )
+`
+
 const SITE_DATA_TABLE = `
   CREATE TABLE IF NOT EXISTS site_data (
-    section TEXT PRIMARY KEY,
+    section TEXT NOT NULL,
+    university TEXT NOT NULL DEFAULT 'default',
     value JSONB NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (section, university)
   )
 `
 
@@ -103,26 +114,45 @@ export async function initDb() {
   await pool.query(CARTS_TABLE)
   await pool.query(ORDERS_TABLE)
   await pool.query(PRODUCTS_TABLE)
-  await pool.query(SITE_DATA_TABLE)
-  // Migration for databases created before email/password auth:
-  // add password_hash if missing and drop the obsolete google_id column.
-  await pool.query(
-    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT"
+  await pool.query(UNIVERSITIES_TABLE)
+
+  // Migration: site_data — add university column and rebuild PK
+  const hasUniCol = await pool.query(
+    "SELECT 1 FROM information_schema.columns WHERE table_name = 'site_data' AND column_name = 'university'"
   )
+  if (hasUniCol.rowCount === 0) {
+    await pool.query("ALTER TABLE site_data ADD COLUMN university TEXT NOT NULL DEFAULT 'default'")
+    await pool.query("ALTER TABLE site_data DROP CONSTRAINT IF EXISTS site_data_pkey")
+    await pool.query("ALTER TABLE site_data ADD PRIMARY KEY (section, university)")
+  }
+
+  await pool.query(SITE_DATA_TABLE)
+
+  // Migration for databases created before email/password auth:
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT")
   await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT")
   await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT true")
   await pool.query("ALTER TABLE users DROP COLUMN IF EXISTS google_id")
+  // University column on users
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS university TEXT")
+
   // Payment columns migration
   await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'cod'")
   await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'pending'")
   await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_ref TEXT")
   await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_receipt TEXT")
   await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()")
+  // University column on orders
+  await pool.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS university TEXT")
+
   await pool.query(TOKENS_TABLE)
+
   // Out-of-stock migration
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS out_of_stock BOOLEAN NOT NULL DEFAULT false")
   // Quantity/inventory migration
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 0")
+  // University column on products
+  await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS university TEXT")
   // Sync out_of_stock flag with quantity
   await pool.query("UPDATE products SET out_of_stock = true WHERE quantity <= 0 AND out_of_stock = false")
   await pool.query("UPDATE products SET out_of_stock = false WHERE quantity > 0 AND out_of_stock = true")

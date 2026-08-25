@@ -30,11 +30,11 @@ export function AuthProvider({ children }) {
   }
 
   // Returns null on success, or an error message
-  const register = async (email, password) => {
+  const register = async (email, password, university) => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, university }),
     })
     const data = await res.json().catch(() => ({}))
     if (res.ok) return null

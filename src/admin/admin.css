@@ -597,3 +597,42 @@
 .order-detail-total strong {
   font-size: 1.1rem;
 }
+
+/* University selector bar */
+.admin-university-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--adm-panel);
+  border-bottom: 1px solid var(--adm-border);
+  position: sticky;
+  top: 52px;
+  z-index: 19;
+}
+
+.uni-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.uni-selector label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--adm-soft);
+  white-space: nowrap;
+}
+
+.uni-selector select {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--adm-border);
+  border-radius: 8px;
+  background: var(--adm-panel);
+  color: var(--adm-text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  min-width: 200px;
+  cursor: pointer;
+}

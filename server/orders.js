@@ -48,9 +48,9 @@ orderRouter.post('/', requireUser, async (req, res) => {
   const total = items.reduce((sum, i) => sum + parsePrice(i.price) * (i.qty ?? 1), 0)
 
   const result = await pool.query(
-    `INSERT INTO orders (user_id, name, phone, email, items, total, status)
-     VALUES ($1, $2, $3, $4, $5, $6, 'pending') RETURNING *`,
-    [req.user.id, name, phone, req.user.email, JSON.stringify(items), `KSh ${total.toLocaleString()}`]
+    `INSERT INTO orders (user_id, name, phone, email, items, total, status, university)
+     VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7) RETURNING *`,
+    [req.user.id, name, phone, req.user.email, JSON.stringify(items), `KSh ${total.toLocaleString()}`, req.user.university]
   )
 
   const order = result.rows[0]
@@ -137,27 +137,37 @@ orderRouter.get('/mine', requireUser, async (req, res) => {
 export const orderAdminRouter = Router()
 
 // Every registered user exactly once, with their live cart (admin).
-// The cart comes from the carts table, so product additions/removals by
-// the customer show up here on the next refresh. Orders are NOT created
-// here — this is a read-only view.
-export async function getCustomers(_req, res) {
-  const result = await pool.query(
-    `SELECT u.id, u.email, u.username, u.display_name AS "displayName", u.phone,
-            u.created_at AS "registeredAt",
+// Supports ?university=<slug> filtering.
+export async function getCustomers(req, res) {
+  const university = req.query.university || null
+  let query = `
+    SELECT u.id, u.email, u.username, u.display_name AS "displayName", u.phone,
+            u.university, u.created_at AS "registeredAt",
             c.items, c.updated_at AS "cartUpdatedAt",
             COALESCE(c.updated_at, u.created_at) AS "lastActive"
      FROM users u
-     LEFT JOIN carts c ON c.user_id = u.id
-     ORDER BY "lastActive" DESC`
-  )
+     LEFT JOIN carts c ON c.user_id = u.id`
+  const params = []
+  if (university) {
+    query += ' WHERE u.university = $1'
+    params.push(university)
+  }
+  query += ' ORDER BY "lastActive" DESC'
+  const result = await pool.query(query, params)
   res.json({ customers: result.rows })
 }
 
-// List all orders, newest first (admin)
-orderAdminRouter.get('/', async (_req, res) => {
-  const result = await pool.query(
-    'SELECT * FROM orders ORDER BY created_at DESC, id DESC'
-  )
+// List all orders, newest first (admin). Supports ?university=<slug> filtering.
+orderAdminRouter.get('/', async (req, res) => {
+  const university = req.query.university || null
+  let query = 'SELECT * FROM orders'
+  const params = []
+  if (university) {
+    query += ' WHERE university = $1'
+    params.push(university)
+  }
+  query += ' ORDER BY created_at DESC, id DESC'
+  const result = await pool.query(query, params)
   res.json({ orders: result.rows })
 })
 
