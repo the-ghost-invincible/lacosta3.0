@@ -505,6 +505,21 @@ app.delete('/api/admin/universities/:slug', requireAuth, async (req, res) => {
   }
 })
 
+// ---------- Admin: university change password (requires superuser verification) ----------
+app.put('/api/admin/universities/:slug/password', requireAnyAdmin, async (req, res) => {
+  const { password } = req.body ?? {}
+  if (!password || password.length < 4) {
+    return res.status(400).json({ error: 'Password must be at least 4 characters' })
+  }
+  const { slug } = req.params
+  const result = await pool.query(
+    'UPDATE universities SET password_hash = $1 WHERE slug = $2 RETURNING id',
+    [hashPassword(password), slug]
+  )
+  if (result.rowCount === 0) return res.status(404).json({ error: 'University not found' })
+  res.json({ ok: true })
+})
+
 // ---------- Admin: ngrok tunnel ----------
 app.get('/api/admin/ngrok', requireAuth, async (_req, res) => {
   try {

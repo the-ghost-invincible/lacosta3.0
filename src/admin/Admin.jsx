@@ -182,7 +182,6 @@ function SuperuserPasswordPrompt({ open, onClose, onVerified }) {
       setBusy(false)
       if (res.ok) {
         onVerified(true)
-        onClose()
       } else {
         setError('Wrong password')
       }
