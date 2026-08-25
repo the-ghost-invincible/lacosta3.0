@@ -283,7 +283,7 @@ orderAdminRouter.delete('/user/:id', async (req, res) => {
   if (!password) return res.status(400).json({ error: 'Password required' })
 
   const { config } = await import('./config.js')
-  if (password !== config.adminPassword) {
+  if (password !== config.superUserPassword) {
     return res.status(403).json({ error: 'Incorrect password' })
   }
 

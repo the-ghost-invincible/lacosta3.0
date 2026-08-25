@@ -187,7 +187,7 @@ function SuperuserPasswordPrompt({ open, onClose, onVerified }) {
       })
       setBusy(false)
       if (res.ok) {
-        onVerified(true)
+        onVerified(true, password)
       } else {
         setError('Wrong password')
       }
@@ -1399,7 +1399,7 @@ function OrdersTab({ university, role }) {
       <SuperuserPasswordPrompt
         open={deleteOrderPrompt !== null}
         onClose={() => setDeleteOrderPrompt(null)}
-        onVerified={(ok) => { if (ok && deleteOrderPrompt) removeOrder(deleteOrderPrompt.id); setDeleteOrderPrompt(null) }}
+        onVerified={(ok, pw) => { if (ok && deleteOrderPrompt) removeOrder(deleteOrderPrompt.id, pw); setDeleteOrderPrompt(null) }}
       />
     </div>
   )
