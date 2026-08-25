@@ -18,7 +18,20 @@ export function Header() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  const [uniName, setUniName] = useState(null)
   const searchRef = useRef(null)
+
+  useEffect(() => {
+    if (user?.university) {
+      fetch('/api/universities')
+        .then((r) => r.json())
+        .then((data) => {
+          const match = (data.universities ?? []).find((u) => u.slug === user.university)
+          if (match) setUniName(match.name)
+        })
+        .catch(() => {})
+    }
+  }, [user?.university])
 
   const categoryResults = useMemo(() => {
     const q = normalize(query)
@@ -163,7 +176,7 @@ export function Header() {
             <div className="brand-mark"><img src="/logo.png" alt="Lacosta" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '12px' }} /></div>
             <div>
               <span className="brand-name">Lacosta</span>
-              <small>Marketplace</small>
+              <small>{uniName || 'Marketplace'}</small>
             </div>
           </Link>
 
