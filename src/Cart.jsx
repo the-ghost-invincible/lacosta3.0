@@ -97,8 +97,9 @@ export function CartPage() {
     const data = await res.json().catch(() => ({}))
     setPhoneOpen(false)
     setOrderId(data.order?.id ?? null)
+    saveToHistory(items, total, currency, data.order?.id ?? null)
     setOrderPlaced(true)
-    clearCart()
+    setBusy(false)
 
     if (paymentMethod === 'mpesa' && data.order?.id) {
       initiateMpesa(data.order.id)
@@ -153,26 +154,8 @@ export function CartPage() {
     setMpesaError('Payment timed out — check your M-Pesa messages')
   }
 
-  const checkout = async () => {
-    if (!items.length || busy) return
-
-    let serverOrderId = null
-
-    if (user && user.phone) {
-      try {
-        const res = await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: user.displayName || user.email, phone: user.phone, items }),
-        })
-        if (res.ok) {
-          const data = await res.json().catch(() => ({}))
-          serverOrderId = data.order?.id ?? null
-        }
-      } catch {}
-    }
-
-    saveToHistory(items, total, currency, serverOrderId)
+  const checkout = () => {
+    if (!items.length || !orderPlaced) return
     clearCart()
     setCheckedOut(true)
   }
@@ -305,10 +288,12 @@ export function CartPage() {
                 <span>Total</span>
                 <span>{formatMoney(total, currency)}</span>
               </div>
-              <button type="button" className="primary-btn cart-place-order-btn" onClick={placeOrder} disabled={busy || checkedOut}>
-                {busy ? 'Processing…' : 'Place order'}
+              <button type="button" className="primary-btn cart-place-order-btn" onClick={placeOrder} disabled={busy || orderPlaced}>
+                {busy ? 'Processing…' : orderPlaced ? 'Order placed ✓' : 'Place order'}
               </button>
-              <button type="button" className="secondary-btn cart-checkout-btn glow" onClick={checkout} disabled={busy || checkedOut}>Checkout</button>
+              <button type="button" className={`secondary-btn cart-checkout-btn${orderPlaced && !checkedOut ? ' glow' : ''}`} onClick={checkout} disabled={!orderPlaced || checkedOut}>
+                {checkedOut ? 'Done ✓' : 'Checkout'}
+              </button>
               <button type="button" className="secondary-btn cart-clear-btn" onClick={clearCart}>
                 Clear cart
               </button>
