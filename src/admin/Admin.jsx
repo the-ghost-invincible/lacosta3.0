@@ -304,7 +304,7 @@ function ChangePasswordModal({ open, onClose, universitySlug }) {
 
 function Dashboard({ role, uniSlug, onLogout, theme, onToggleTheme }) {
   const [db, setDb] = useState(null)
-  const [tab, setTab] = useState(role === 'subuser' ? 'orders' : 'products')
+  const [tab, setTab] = useState('products')
   const [msg, setMsg] = useState(null)
   const [ngrokUrl, setNgrokUrl] = useState(null)
   const [copied, setCopied] = useState(false)
@@ -506,7 +506,7 @@ function Dashboard({ role, uniSlug, onLogout, theme, onToggleTheme }) {
     { id: 'menus', label: 'Subcategories' },
     { id: 'content', label: 'Site content' },
   ]
-  const tabs = role === 'subuser' ? allTabs.filter((t) => t.id === 'orders') : allTabs
+  const tabs = allTabs
 
   return (
     <div className="admin-shell">
