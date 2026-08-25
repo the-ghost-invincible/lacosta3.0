@@ -69,6 +69,20 @@ export function HistoryPage() {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
   }
 
+  const cancelOrder = async (orderId) => {
+    if (!confirm('Cancel this order?')) return
+    try {
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'canceled' }),
+      })
+      if (res.ok) {
+        setOrderStatuses((prev) => ({ ...prev, [orderId]: 'canceled' }))
+      }
+    } catch {}
+  }
+
   const clearAll = () => {
     if (!confirm('Clear entire purchase history?')) return
     clearHistory()
@@ -129,6 +143,9 @@ export function HistoryPage() {
                         <span className={`order-status-badge ${STATUS_CLASSES[serverStatus] ?? ''}`}>
                           {STATUS_LABELS[serverStatus] ?? serverStatus}
                         </span>
+                      )}
+                      {entry.orderId && serverStatus !== 'canceled' && serverStatus !== 'delivered' && (
+                        <button type="button" className="btn danger small" onClick={() => cancelOrder(entry.orderId)}>Cancel</button>
                       )}
                       <button type="button" className="btn ghost small" onClick={() => reorder(entry)}>Reorder</button>
                       <button type="button" className="btn danger small" onClick={() => removeEntry(entry.id)}>✕</button>
