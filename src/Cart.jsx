@@ -48,6 +48,7 @@ export function CartPage() {
   const [mpesaStatus, setMpesaStatus] = useState(null)
   const [mpesaReceipt, setMpesaReceipt] = useState(null)
   const [checkedOut, setCheckedOut] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [expandedId, setExpandedId] = useState(null)
   const currency = items.find((i) => /[^\d]/.test(String(i.price ?? '')))
     ? prefixOf(items[0].price)
@@ -63,6 +64,7 @@ export function CartPage() {
     setPhoneValue(user.phone ?? '')
     setNameError(null)
     setPhoneError(null)
+    setBusy(true)
     setPhoneOpen(true)
   }
 
@@ -77,6 +79,7 @@ export function CartPage() {
     if (phoneErr) setPhoneError(phoneErr)
     if (nameErr || phoneErr) {
       setPhoneBusy(false)
+      setBusy(false)
       return
     }
     const res = await fetch('/api/orders', {
@@ -88,6 +91,7 @@ export function CartPage() {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       setPhoneError(data.error ?? 'Could not place the order — try again')
+      setBusy(false)
       return
     }
     const data = await res.json().catch(() => ({}))
@@ -150,7 +154,8 @@ export function CartPage() {
   }
 
   const checkout = async () => {
-    if (!items.length) return
+    if (!items.length || busy) return
+    setBusy(true)
 
     let serverOrderId = null
 
@@ -301,9 +306,13 @@ export function CartPage() {
                 <span>Total</span>
                 <span>{formatMoney(total, currency)}</span>
               </div>
-              <button type="button" className="primary-btn cart-place-order-btn" onClick={placeOrder}>Place order</button>
-              <button type="button" className="secondary-btn cart-checkout-btn glow" onClick={checkout}>Checkout</button>
-              <button type="button" className="secondary-btn cart-clear-btn" onClick={clearCart}>
+              <button type="button" className="primary-btn cart-place-order-btn" onClick={placeOrder} disabled={busy}>
+                {busy ? 'Processing…' : 'Place order'}
+              </button>
+              <button type="button" className="secondary-btn cart-checkout-btn glow" onClick={checkout} disabled={busy}>
+                {busy ? 'Processing…' : 'Checkout'}
+              </button>
+              <button type="button" className="secondary-btn cart-clear-btn" onClick={clearCart} disabled={busy}>
                 Clear cart
               </button>
             </aside>
@@ -354,7 +363,7 @@ export function CartPage() {
             <button type="submit" className="primary-btn" disabled={phoneBusy || mpesaBusy}>
               {phoneBusy ? 'Placing…' : mpesaBusy ? 'Processing payment…' : paymentMethod === 'mpesa' ? 'Pay with M-Pesa' : 'Place order'}
             </button>
-            <button type="button" className="text-btn" onClick={() => setPhoneOpen(false)}>
+            <button type="button" className="text-btn" onClick={() => { setPhoneOpen(false); setBusy(false) }}>
               Cancel
             </button>
           </form>
