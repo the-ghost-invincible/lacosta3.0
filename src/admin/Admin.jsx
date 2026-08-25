@@ -239,7 +239,32 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
     onLogout()
   }
 
-  if (!db) return <div className="admin-shell"><div className="admin-content">Loading…</div></div>
+  if (!db && !selectedUni) return (
+    <div className="admin-shell">
+      <div className="admin-content" style={{ textAlign: 'center', padding: '3rem' }}>
+        {universities.length === 0 ? (
+          <>
+            <h2>Welcome to Lacosta Admin</h2>
+            <p style={{ margin: '1rem 0', color: 'var(--text-secondary)' }}>Create a university to get started.</p>
+            <div style={{ marginTop: '1rem' }}>
+              <input
+                type="text"
+                placeholder="e.g. University of Nairobi"
+                value={newUniName}
+                onChange={(e) => setNewUniName(e.target.value)}
+                style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', marginRight: '0.5rem', width: '260px' }}
+              />
+              <button className="btn" disabled={newUniBusy || !newUniName.trim()} onClick={addUniversity}>
+                {newUniBusy ? 'Creating…' : 'Create'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div>Loading…</div>
+        )}
+      </div>
+    </div>
+  )
 
   const tabs = [
     { id: 'products', label: 'Products' },
