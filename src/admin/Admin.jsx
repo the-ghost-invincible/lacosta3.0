@@ -312,6 +312,7 @@ function Dashboard({ role, uniSlug, onLogout, theme, onToggleTheme }) {
   const [selectedUni, setSelectedUni] = useState(uniSlug ?? null)
   const [showAddUni, setShowAddUni] = useState(false)
   const [newUniName, setNewUniName] = useState('')
+  const [newUniPassword, setNewUniPassword] = useState('')
   const [newUniBusy, setNewUniBusy] = useState(false)
   const [showChangePassword, setShowChangePassword] = useState(false)
   const [deleteOrderTarget, setDeleteOrderTarget] = useState(null)
@@ -376,12 +377,13 @@ function Dashboard({ role, uniSlug, onLogout, theme, onToggleTheme }) {
     try {
       const res = await api('/api/admin/universities', {
         method: 'POST',
-        body: JSON.stringify({ name: newUniName.trim() }),
+        body: JSON.stringify({ name: newUniName.trim(), password: newUniPassword || undefined }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         flash('University created')
         setNewUniName('')
+        setNewUniPassword('')
         setShowAddUni(false)
         loadUniversities()
         if (data.university) {
@@ -475,6 +477,13 @@ function Dashboard({ role, uniSlug, onLogout, theme, onToggleTheme }) {
                 value={newUniName}
                 onChange={(e) => setNewUniName(e.target.value)}
                 style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', marginRight: '0.5rem', width: '260px' }}
+              />
+              <input
+                type="password"
+                placeholder="Admin password (optional)"
+                value={newUniPassword}
+                onChange={(e) => setNewUniPassword(e.target.value)}
+                style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', marginRight: '0.5rem', width: '200px' }}
               />
               <button className="btn" disabled={newUniBusy || !newUniName.trim()} onClick={addUniversity}>
                 {newUniBusy ? 'Creating…' : 'Create'}
@@ -576,6 +585,15 @@ function Dashboard({ role, uniSlug, onLogout, theme, onToggleTheme }) {
                 onChange={(e) => setNewUniName(e.target.value)}
                 placeholder="e.g. University of Nairobi"
                 autoFocus
+              />
+            </label>
+            <label className="form-field">
+              <span>Admin password (optional)</span>
+              <input
+                type="password"
+                value={newUniPassword}
+                onChange={(e) => setNewUniPassword(e.target.value)}
+                placeholder="Password for university admin login"
               />
             </label>
             <div className="form-actions">
