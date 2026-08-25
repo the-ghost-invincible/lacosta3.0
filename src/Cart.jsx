@@ -154,7 +154,7 @@ export function CartPage() {
   }
 
   const checkout = async () => {
-    if (!items.length) return
+    if (!items.length || busy) return
 
     let serverOrderId = null
 
@@ -305,10 +305,10 @@ export function CartPage() {
                 <span>Total</span>
                 <span>{formatMoney(total, currency)}</span>
               </div>
-              <button type="button" className="primary-btn cart-place-order-btn" onClick={placeOrder} disabled={busy}>
+              <button type="button" className="primary-btn cart-place-order-btn" onClick={placeOrder} disabled={busy || checkedOut}>
                 {busy ? 'Processing…' : 'Place order'}
               </button>
-              <button type="button" className="secondary-btn cart-checkout-btn glow" onClick={checkout}>Checkout</button>
+              <button type="button" className="secondary-btn cart-checkout-btn glow" onClick={checkout} disabled={busy || checkedOut}>Checkout</button>
               <button type="button" className="secondary-btn cart-clear-btn" onClick={clearCart}>
                 Clear cart
               </button>
