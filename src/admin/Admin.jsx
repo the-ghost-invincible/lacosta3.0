@@ -1258,7 +1258,7 @@ function OrdersTab({ university, role }) {
                       <button
                         type="button"
                         className="btn small paid-btn"
-                        disabled={busyId === order.id}
+                        disabled={busyId === order.id || order.status === 'canceled'}
                         onClick={() => setPaymentStatus(order.id, 'paid')}
                       >
                         Mark Paid
