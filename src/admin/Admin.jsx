@@ -319,8 +319,13 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
   const [showAddUni, setShowAddUni] = useState(false)
   const [newUniName, setNewUniName] = useState('')
   const [newUniPassword, setNewUniPassword] = useState('')
+  const [newUniEmail, setNewUniEmail] = useState('')
   const [newUniBusy, setNewUniBusy] = useState(false)
   const [showChangePassword, setShowChangePassword] = useState(false)
+  const [showEditEmail, setShowEditEmail] = useState(false)
+  const [editEmailValue, setEditEmailValue] = useState('')
+  const [editEmailBusy, setEditEmailBusy] = useState(false)
+  const [emailVerifyPrompt, setEmailVerifyPrompt] = useState(false)
   const [deleteOrderTarget, setDeleteOrderTarget] = useState(null)
   const [showDeleteUniPrompt, setShowDeleteUniPrompt] = useState(false)
   const location = useLocation()
@@ -383,13 +388,14 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
     try {
       const res = await api('/api/admin/universities', {
         method: 'POST',
-        body: JSON.stringify({ name: newUniName.trim(), password: newUniPassword || undefined }),
+        body: JSON.stringify({ name: newUniName.trim(), password: newUniPassword || undefined, email: newUniEmail.trim() || undefined }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         flash('University created')
         setNewUniName('')
         setNewUniPassword('')
+        setNewUniEmail('')
         setShowAddUni(false)
         loadUniversities()
         if (data.university) {
@@ -491,6 +497,13 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
                 onChange={(e) => setNewUniPassword(e.target.value)}
                 style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', marginRight: '0.5rem', width: '200px' }}
               />
+              <input
+                type="email"
+                placeholder="Sending email (optional)"
+                value={newUniEmail}
+                onChange={(e) => setNewUniEmail(e.target.value)}
+                style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', marginRight: '0.5rem', width: '260px' }}
+              />
               <button className="btn" disabled={newUniBusy || !newUniName.trim()} onClick={addUniversity}>
                 {newUniBusy ? 'Creating…' : 'Create'}
               </button>
@@ -575,6 +588,23 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
               Change Password
             </button>
           )}
+          {selectedUni && (
+            <button type="button" className="btn small" onClick={() => {
+              const uni = universities.find((u) => u.slug === selectedUni)
+              setEditEmailValue(uni?.email ?? '')
+              setShowEditEmail(true)
+            }}>
+              Change Email
+            </button>
+          )}
+          {selectedUni && (() => {
+            const uni = universities.find((u) => u.slug === selectedUni)
+            return uni?.email ? (
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>
+                From: {uni.email}
+              </span>
+            ) : null
+          })()}
         </div>
         <button type="button" className="btn small" onClick={() => setShowAddUni(true)}>
           + Add University
@@ -603,6 +633,15 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
                 value={newUniPassword}
                 onChange={(e) => setNewUniPassword(e.target.value)}
                 placeholder="Password for university admin login"
+              />
+            </label>
+            <label className="form-field">
+              <span>Sending email (optional)</span>
+              <input
+                type="email"
+                value={newUniEmail}
+                onChange={(e) => setNewUniEmail(e.target.value)}
+                placeholder="e.g. lacostamarketsmamangina@gmail.com"
               />
             </label>
             <div className="form-actions">
@@ -692,6 +731,51 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
         open={showChangePassword}
         onClose={() => setShowChangePassword(false)}
         universitySlug={selectedUni}
+      />
+
+      {showEditEmail && (
+        <div className="admin-modal-overlay" onClick={() => setShowEditEmail(false)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Change sending email</h2>
+            <p>Set the email address that outgoing emails will be sent from for <strong>{selectedUni}</strong>.</p>
+            <label className="form-field">
+              <span>Email address</span>
+              <input
+                type="email"
+                value={editEmailValue}
+                onChange={(e) => setEditEmailValue(e.target.value)}
+                placeholder="e.g. lacostamarketsmamangina@gmail.com"
+                autoFocus
+              />
+            </label>
+            <div className="form-actions">
+              <button type="button" className="btn ghost" onClick={() => setShowEditEmail(false)}>Cancel</button>
+              <button type="button" className="btn" disabled={editEmailBusy || !editEmailValue.trim()} onClick={() => setEmailVerifyPrompt(true)}>
+                {editEmailBusy ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <SuperuserPasswordPrompt
+        open={emailVerifyPrompt}
+        onClose={() => setEmailVerifyPrompt(false)}
+        onVerified={async (ok) => {
+          if (!ok) return
+          setEditEmailBusy(true)
+          const res = await api(`/api/admin/universities/${selectedUni}/email`, {
+            method: 'PUT',
+            body: JSON.stringify({ email: editEmailValue.trim() }),
+          })
+          setEditEmailBusy(false)
+          setEmailVerifyPrompt(false)
+          if (res.ok) {
+            flash('Email updated')
+            setShowEditEmail(false)
+            loadUniversities()
+          }
+        }}
       />
 
       {msg && <div className="toast">{msg}</div>}

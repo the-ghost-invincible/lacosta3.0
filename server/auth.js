@@ -95,6 +95,7 @@ router.post('/register', async (req, res) => {
   sendEmail({
     to: email,
     subject: 'Verify your Lacosta account',
+    university,
     html: `<p>Welcome to Lacosta!</p>
            <p>Click the link below to verify your email address:</p>
            <p><a href="${verifyUrl}">Verify email</a></p>
@@ -266,6 +267,7 @@ router.post('/verify/resend', async (req, res) => {
   sendEmail({
     to: user.email,
     subject: 'Verify your Lacosta account',
+    university: user.university,
     html: `<p>Click the link below to verify your email address:</p>
            <p><a href="${verifyUrl}">Verify email</a></p>
            <p>This link expires in 24 hours.</p>`,
@@ -281,7 +283,7 @@ router.post('/verify/resend-public', async (req, res) => {
     return res.status(400).json({ error: 'Enter a valid email address' })
   }
 
-  const result = await pool.query('SELECT id, verified FROM users WHERE LOWER(email) = LOWER($1)', [email])
+  const result = await pool.query('SELECT id, verified, university FROM users WHERE LOWER(email) = LOWER($1)', [email])
   const user = result.rows[0]
 
   // Always return success to prevent email enumeration
@@ -300,6 +302,7 @@ router.post('/verify/resend-public', async (req, res) => {
   sendEmail({
     to: email,
     subject: 'Verify your Lacosta account',
+    university: user.university,
     html: `<p>Click the link below to verify your email address:</p>
            <p><a href="${verifyUrl}">Verify email</a></p>
            <p>This link expires in 24 hours.</p>`,
@@ -315,7 +318,7 @@ router.post('/forgot-password', async (req, res) => {
     return res.status(400).json({ error: 'Enter a valid email address' })
   }
 
-  const result = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email])
+  const result = await pool.query('SELECT id, university FROM users WHERE LOWER(email) = LOWER($1)', [email])
   const user = result.rows[0]
 
   // Always return success to prevent email enumeration
@@ -334,6 +337,7 @@ router.post('/forgot-password', async (req, res) => {
   sendEmail({
     to: email,
     subject: 'Reset your Lacosta password',
+    university: user.university,
     html: `<p>You requested a password reset.</p>
            <p><a href="${resetUrl}">Set new password</a></p>
            <p>This link expires in 1 hour. If you didn't request this, ignore this email.</p>`,

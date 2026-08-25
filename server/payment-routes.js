@@ -107,6 +107,7 @@ router.post('/mpesa/callback', async (req, res) => {
       sendEmail({
         to: order.email,
         subject: `Order #${order.id} confirmed - Payment received`,
+        university: order.university,
         html: `
           <h2>Payment confirmed!</h2>
           <p>Your order <strong>#${order.id}</strong> has been paid successfully.</p>

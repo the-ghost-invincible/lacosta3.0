@@ -67,6 +67,7 @@ orderRouter.post('/', requireUser, async (req, res) => {
   sendEmail({
     to: req.user.email,
     subject: `Order #${order.id} received — Lacosta`,
+    university: req.user.university,
     html: `
       <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
         <h2 style="color:#65a30d">Order confirmed!</h2>
@@ -94,6 +95,7 @@ orderRouter.post('/', requireUser, async (req, res) => {
     sendEmail({
       to: config.adminEmail,
       subject: `🛒 New Order #${order.id} — KSh ${total.toLocaleString()}`,
+      university: req.user.university,
       html: `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
           <h2 style="color:#65a30d">New order received!</h2>
@@ -210,6 +212,7 @@ orderAdminRouter.put('/:id/status', async (req, res) => {
     sendEmail({
       to: order.email,
       subject: `Order #${order.id} ${statusMessages[status].title} — Lacosta`,
+      university: order.university,
       html: `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
           <h2 style="color:#65a30d">${statusMessages[status].title}</h2>
