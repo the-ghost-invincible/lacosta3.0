@@ -145,7 +145,7 @@ export function HistoryPage() {
                           {STATUS_LABELS[serverStatus] ?? serverStatus}
                         </span>
                       )}
-                      {entry.orderId && serverStatus !== 'canceled' && serverStatus !== 'delivered' && (
+                      {entry.orderId && serverStatus === 'pending' && (
                         <button type="button" className="btn danger small" onClick={() => cancelOrder(entry.orderId)}>Cancel</button>
                       )}
                       <button type="button" className="btn ghost small" onClick={() => reorder(entry)}>Reorder</button>

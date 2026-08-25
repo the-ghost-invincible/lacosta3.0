@@ -141,7 +141,7 @@ export function AccountPage() {
                       <span className={`status-badge payment-${order.payment_status ?? 'pending'}`}>
                         {PAYMENT_LABELS[order.payment_status ?? 'pending'] ?? order.payment_status}
                       </span>
-                      {order.status !== 'canceled' && order.status !== 'delivered' && (
+                      {order.status === 'pending' && (
                         <button type="button" className="btn danger small" onClick={() => cancelOrder(order.id)}>Cancel</button>
                       )}
                     </div>
