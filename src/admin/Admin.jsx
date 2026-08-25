@@ -513,7 +513,7 @@ function Dashboard({ role, uniSlug, onLogout, theme, onToggleTheme }) {
       <header className="admin-bar">
         <div className="admin-brand">
           <h1>Lacosta Admin</h1>
-          <small>Manage your store</small>
+          <small>{role === 'subuser' ? (universities.find((u) => u.slug === uniSlug)?.name || uniSlug) : 'Manage your store'}</small>
         </div>
         <div className="admin-bar-actions">
           {role === 'subuser' && (
