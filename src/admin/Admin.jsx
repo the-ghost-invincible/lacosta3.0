@@ -239,7 +239,7 @@ function Dashboard({ onLogout, theme, onToggleTheme }) {
     onLogout()
   }
 
-  if (!db && !selectedUni) return (
+  if (!db) return (
     <div className="admin-shell">
       <div className="admin-content" style={{ textAlign: 'center', padding: '3rem' }}>
         {universities.length === 0 ? (
