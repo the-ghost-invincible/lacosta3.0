@@ -176,7 +176,8 @@ export function Header() {
             <div className="brand-mark"><img src="/logo.png" alt="Lacosta" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '12px' }} /></div>
             <div>
               <span className="brand-name">Lacosta</span>
-              <small>{uniName || 'Marketplace'}</small>
+              <small>Marketplace</small>
+              {uniName && <small style={{ display: 'block', opacity: 0.7, fontSize: '0.65rem' }}>{uniName}</small>}
             </div>
           </Link>
 
