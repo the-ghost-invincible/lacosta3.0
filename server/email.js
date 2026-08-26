@@ -10,7 +10,7 @@ export async function sendEmail({ to, subject, html, university }) {
     try {
       const result = await pool.query('SELECT email FROM universities WHERE slug = $1', [university])
       if (result.rows[0]?.email) {
-        from = `${config.emailFrom.split('<')[0].trim()} <${result.rows[0].email}>`
+        from = result.rows[0].email
       }
     } catch {}
   }
