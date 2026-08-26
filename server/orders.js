@@ -102,6 +102,7 @@ orderRouter.post('/', requireUser, async (req, res) => {
 
   // Send notification to admin
   const notifyTo = await getNotifyEmail(req.user.university)
+  console.log(`[order-notify] Order #${order.id} | Uni: ${req.user.university} | Notify to: ${notifyTo}`)
   if (notifyTo) {
     sendEmail({
       to: notifyTo,
