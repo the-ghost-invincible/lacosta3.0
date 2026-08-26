@@ -91,9 +91,18 @@ orderRouter.post('/', requireUser, async (req, res) => {
   }).catch(() => {})
 
   // Send notification to admin
-  if (config.adminEmail) {
+  let notifyTo = config.adminEmail
+  if (req.user.university) {
+    try {
+      const uniResult = await pool.query('SELECT notify_email FROM universities WHERE slug = $1', [req.user.university])
+      if (uniResult.rows[0]?.notify_email) {
+        notifyTo = uniResult.rows[0].notify_email
+      }
+    } catch {}
+  }
+  if (notifyTo) {
     sendEmail({
-      to: config.adminEmail,
+      to: notifyTo,
       subject: `🛒 New Order #${order.id} — KSh ${total.toLocaleString()}`,
       university: req.user.university,
       html: `

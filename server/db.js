@@ -155,6 +155,8 @@ export async function initDb() {
   await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS password_hash TEXT")
   // University email migration
   await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS email TEXT")
+  // University notify email migration
+  await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS notify_email TEXT")
   // University column on products
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS university TEXT")
   // Sync out_of_stock flag with quantity

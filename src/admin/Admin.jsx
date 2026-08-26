@@ -326,6 +326,10 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
   const [editEmailValue, setEditEmailValue] = useState('')
   const [editEmailBusy, setEditEmailBusy] = useState(false)
   const [emailVerifyPrompt, setEmailVerifyPrompt] = useState(false)
+  const [showEditNotifyEmail, setShowEditNotifyEmail] = useState(false)
+  const [editNotifyEmailValue, setEditNotifyEmailValue] = useState('')
+  const [editNotifyEmailBusy, setEditNotifyEmailBusy] = useState(false)
+  const [notifyEmailVerifyPrompt, setNotifyEmailVerifyPrompt] = useState(false)
   const [deleteOrderTarget, setDeleteOrderTarget] = useState(null)
   const [showDeleteUniPrompt, setShowDeleteUniPrompt] = useState(false)
   const location = useLocation()
@@ -605,6 +609,23 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
               </span>
             ) : null
           })()}
+          {selectedUni && (
+            <button type="button" className="btn small" onClick={() => {
+              const uni = universities.find((u) => u.slug === selectedUni)
+              setEditNotifyEmailValue(uni?.notify_email ?? '')
+              setShowEditNotifyEmail(true)
+            }}>
+              Notify Email
+            </button>
+          )}
+          {selectedUni && (() => {
+            const uni = universities.find((u) => u.slug === selectedUni)
+            return uni?.notify_email ? (
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>
+                Notify: {uni.notify_email}
+              </span>
+            ) : null
+          })()}
         </div>
         <button type="button" className="btn small" onClick={() => setShowAddUni(true)}>
           + Add University
@@ -773,6 +794,51 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
           if (res.ok) {
             flash('Email updated')
             setShowEditEmail(false)
+            loadUniversities()
+          }
+        }}
+      />
+
+      {showEditNotifyEmail && (
+        <div className="admin-modal-overlay" onClick={() => setShowEditNotifyEmail(false)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Change notification email</h2>
+            <p>Set the email that receives order notifications for <strong>{selectedUni}</strong>.</p>
+            <label className="form-field">
+              <span>Notification email</span>
+              <input
+                type="email"
+                value={editNotifyEmailValue}
+                onChange={(e) => setEditNotifyEmailValue(e.target.value)}
+                placeholder="e.g. lacostamarketsmnuc@gmail.com"
+                autoFocus
+              />
+            </label>
+            <div className="form-actions">
+              <button type="button" className="btn ghost" onClick={() => setShowEditNotifyEmail(false)}>Cancel</button>
+              <button type="button" className="btn" disabled={editNotifyEmailBusy || !editNotifyEmailValue.trim()} onClick={() => setNotifyEmailVerifyPrompt(true)}>
+                {editNotifyEmailBusy ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <SuperuserPasswordPrompt
+        open={notifyEmailVerifyPrompt}
+        onClose={() => setNotifyEmailVerifyPrompt(false)}
+        onVerified={async (ok) => {
+          if (!ok) return
+          setEditNotifyEmailBusy(true)
+          const res = await api(`/api/admin/universities/${selectedUni}/notify-email`, {
+            method: 'PUT',
+            body: JSON.stringify({ notify_email: editNotifyEmailValue.trim() }),
+          })
+          setEditNotifyEmailBusy(false)
+          setNotifyEmailVerifyPrompt(false)
+          if (res.ok) {
+            flash('Notification email updated')
+            setShowEditNotifyEmail(false)
             loadUniversities()
           }
         }}

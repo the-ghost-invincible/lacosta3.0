@@ -219,7 +219,7 @@ app.get('/api/data', async (req, res) => {
 // ---------- Universities ----------
 app.get('/api/universities', async (_req, res) => {
   try {
-    const result = await pool.query('SELECT id, name, slug, email, created_at, (password_hash IS NOT NULL) AS "hasPassword" FROM universities ORDER BY name')
+    const result = await pool.query('SELECT id, name, slug, email, notify_email, created_at, (password_hash IS NOT NULL) AS "hasPassword" FROM universities ORDER BY name')
     res.json({ universities: result.rows })
   } catch {
     res.json({ universities: [] })
@@ -449,7 +449,7 @@ app.delete('/api/admin/products/:id', requireAnyAdmin, async (req, res) => {
 // ---------- Admin: universities (superuser only for create/delete/password) ----------
 app.post('/api/admin/universities', requireAuth, async (req, res) => {
   try {
-    const { name, password, email } = req.body ?? {}
+    const { name, password, email, notify_email } = req.body ?? {}
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'University name is required' })
     }
@@ -462,9 +462,10 @@ app.post('/api/admin/universities', requireAuth, async (req, res) => {
 
     const pwHash = password ? hashPassword(password) : null
     const uniEmail = email ? email.trim() : null
+    const uniNotifyEmail = notify_email ? notify_email.trim() : null
     const result = await pool.query(
-      'INSERT INTO universities (name, slug, password_hash, email) VALUES ($1, $2, $3, $4) RETURNING id, name, slug, email, created_at',
-      [name.trim(), slug, pwHash, uniEmail]
+      'INSERT INTO universities (name, slug, password_hash, email, notify_email) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, slug, email, notify_email, created_at',
+      [name.trim(), slug, pwHash, uniEmail, uniNotifyEmail]
     )
     const uni = result.rows[0]
 
@@ -538,6 +539,21 @@ app.put('/api/admin/universities/:slug/email', requireAnyAdmin, async (req, res)
   const result = await pool.query(
     'UPDATE universities SET email = $1 WHERE slug = $2 RETURNING id',
     [email.trim(), slug]
+  )
+  if (result.rowCount === 0) return res.status(404).json({ error: 'University not found' })
+  res.json({ ok: true })
+})
+
+// ---------- Admin: university update notify email (requires superuser verification) ----------
+app.put('/api/admin/universities/:slug/notify-email', requireAnyAdmin, async (req, res) => {
+  const { notify_email } = req.body ?? {}
+  if (!notify_email || !notify_email.trim()) {
+    return res.status(400).json({ error: 'Email is required' })
+  }
+  const { slug } = req.params
+  const result = await pool.query(
+    'UPDATE universities SET notify_email = $1 WHERE slug = $2 RETURNING id',
+    [notify_email.trim(), slug]
   )
   if (result.rowCount === 0) return res.status(404).json({ error: 'University not found' })
   res.json({ ok: true })
