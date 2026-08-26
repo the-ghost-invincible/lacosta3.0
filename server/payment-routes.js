@@ -3,6 +3,17 @@ import { pool } from './db.js'
 import { userFromSession } from './auth.js'
 import { initiateSTKPush, querySTKStatus, parseCallback, isConfigured, getConfig } from './payments.js'
 import { sendEmail } from './email.js'
+import { config } from './config.js'
+
+async function getNotifyEmail(university) {
+  if (!university) return config.adminEmail || null
+  try {
+    const result = await pool.query('SELECT notify_email FROM universities WHERE slug = $1', [university])
+    return result.rows[0]?.notify_email || config.adminEmail || null
+  } catch {
+    return config.adminEmail || null
+  }
+}
 
 const router = Router()
 
@@ -103,7 +114,7 @@ router.post('/mpesa/callback', async (req, res) => {
 
     const order = result.rows[0]
     if (order && paymentStatus === 'paid') {
-      // Send confirmation email
+      // Send confirmation email to customer
       sendEmail({
         to: order.email,
         subject: `Order #${order.id} confirmed - Payment received`,
@@ -116,6 +127,26 @@ router.post('/mpesa/callback', async (req, res) => {
           <p>We'll process your order shortly.</p>
         `,
       }).catch(() => {})
+
+      // Notify university admin of payment
+      const notifyTo = await getNotifyEmail(order.university)
+      if (notifyTo) {
+        sendEmail({
+          to: notifyTo,
+          subject: `💰 Order #${order.id} paid - KSh ${Number(callback.amount).toLocaleString()}`,
+          university: order.university,
+          html: `
+            <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+              <h2>Payment received!</h2>
+              <p><strong>Order #${order.id}</strong></p>
+              <p><strong>Customer:</strong> ${order.name} (${order.email})</p>
+              <p><strong>Amount:</strong> KSh ${Number(callback.amount).toLocaleString()}</p>
+              <p><strong>M-Pesa receipt:</strong> ${callback.mpesaReceiptNumber}</p>
+              <p><strong>Items:</strong> ${(order.items ?? []).map(i => `${i.name} x${i.qty ?? 1}`).join(', ')}</p>
+            </div>
+          `,
+        }).catch(() => {})
+      }
     }
   } catch (err) {
     console.error('M-Pesa callback error:', err)

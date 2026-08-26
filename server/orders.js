@@ -6,6 +6,16 @@ import { config } from './config.js'
 
 const STATUSES = ['pending', 'confirmed', 'canceled', 'delivered']
 
+async function getNotifyEmail(university) {
+  if (!university) return config.adminEmail || null
+  try {
+    const result = await pool.query('SELECT notify_email FROM universities WHERE slug = $1', [university])
+    return result.rows[0]?.notify_email || config.adminEmail || null
+  } catch {
+    return config.adminEmail || null
+  }
+}
+
 export const orderRouter = Router()
 
 async function requireUser(req, res, next) {
@@ -91,15 +101,7 @@ orderRouter.post('/', requireUser, async (req, res) => {
   }).catch(() => {})
 
   // Send notification to admin
-  let notifyTo = config.adminEmail
-  if (req.user.university) {
-    try {
-      const uniResult = await pool.query('SELECT notify_email FROM universities WHERE slug = $1', [req.user.university])
-      if (uniResult.rows[0]?.notify_email) {
-        notifyTo = uniResult.rows[0].notify_email
-      }
-    } catch {}
-  }
+  const notifyTo = await getNotifyEmail(req.user.university)
   if (notifyTo) {
     sendEmail({
       to: notifyTo,
@@ -156,7 +158,28 @@ orderRouter.put('/:id/status', requireUser, async (req, res) => {
     [status, req.params.id, req.user.id, 'pending']
   )
   if (result.rowCount === 0) return res.status(404).json({ error: 'Order not found or cannot be canceled' })
-  res.json({ ok: true, order: result.rows[0] })
+
+  const canceledOrder = result.rows[0]
+
+  // Notify university admin of cancellation
+  const cancelNotifyTo = await getNotifyEmail(canceledOrder.university)
+  if (cancelNotifyTo) {
+    sendEmail({
+      to: cancelNotifyTo,
+      subject: `❌ Order #${canceledOrder.id} canceled by customer`,
+      university: canceledOrder.university,
+      html: `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+          <h2>Order #${canceledOrder.id} canceled</h2>
+          <p><strong>Customer:</strong> ${canceledOrder.name} (${canceledOrder.email})</p>
+          <p><strong>Items:</strong> ${(canceledOrder.items ?? []).map(i => `${i.name} x${i.qty ?? 1}`).join(', ')}</p>
+          <p><strong>Total:</strong> ${canceledOrder.total}</p>
+        </div>
+      `,
+    }).catch(() => {})
+  }
+
+  res.json({ ok: true, order: canceledOrder })
 })
 
 export const orderAdminRouter = Router()
@@ -228,6 +251,25 @@ orderAdminRouter.put('/:id/status', async (req, res) => {
           <p>Hi ${order.name},</p>
           <p>${statusMessages[status].body}</p>
           <p><strong>Order #${order.id}</strong></p>
+          <p><strong>Items:</strong> ${(order.items ?? []).map(i => `${i.name} x${i.qty ?? 1}`).join(', ')}</p>
+          <p><strong>Total:</strong> ${order.total}</p>
+        </div>
+      `,
+    }).catch(() => {})
+  }
+
+  // Send status update notification to university admin
+  const statusNotifyTo = await getNotifyEmail(order.university)
+  if (statusNotifyTo && statusMessages[status]) {
+    const statusEmoji = { confirmed: '✅', canceled: '❌', delivered: '📦' }
+    sendEmail({
+      to: statusNotifyTo,
+      subject: `${statusEmoji[status] ?? '📋'} Order #${order.id} ${statusMessages[status].title}`,
+      university: order.university,
+      html: `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+          <h2>Order #${order.id} ${statusMessages[status].title}</h2>
+          <p><strong>Customer:</strong> ${order.name} (${order.email})</p>
           <p><strong>Items:</strong> ${(order.items ?? []).map(i => `${i.name} x${i.qty ?? 1}`).join(', ')}</p>
           <p><strong>Total:</strong> ${order.total}</p>
         </div>
