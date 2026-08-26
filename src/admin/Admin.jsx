@@ -524,6 +524,7 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
     { id: 'products', label: 'Products' },
     { id: 'customers', label: 'Customers' },
     { id: 'orders', label: 'Orders' },
+    { id: 'payments', label: 'Payments' },
     { id: 'featured', label: 'Featured deals' },
     { id: 'categories', label: 'Categories' },
     { id: 'menus', label: 'Subcategories' },
@@ -714,6 +715,9 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
             )}
             {tab === 'orders' && (
               <OrdersTab university={selectedUni} role={role} />
+            )}
+            {tab === 'payments' && (
+              <PaymentsTab university={selectedUni} role={role} baseUrl={ngrokUrl || 'https://lacostamarkets.site'} />
             )}
             {tab === 'featured' && (
               <FeaturedTab products={db.featuredProducts} categories={db.categories} onSave={(v) => save('featuredProducts', v)} />
@@ -1550,6 +1554,219 @@ function OrdersTab({ university, role }) {
         open={deleteOrderPrompt !== null}
         onClose={() => setDeleteOrderPrompt(null)}
         onVerified={(ok, pw) => { if (ok && deleteOrderPrompt) removeOrder(deleteOrderPrompt.id, pw); setDeleteOrderPrompt(null) }}
+      />
+    </div>
+  )
+}
+
+function PaymentsTab({ university, role, baseUrl }) {
+  const [config, setConfig] = useState(null)
+  const [apiKey, setApiKey] = useState('')
+  const [webhookSecret, setWebhookSecret] = useState('')
+  const [environment, setEnvironment] = useState('sandbox')
+  const [tillNumber, setTillNumber] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [showWebhookSecret, setShowWebhookSecret] = useState(false)
+  const [superuserPrompt, setSuperuserPrompt] = useState(false)
+  const [pendingSave, setPendingSave] = useState(false)
+
+  useEffect(() => {
+    if (!university) return
+    api(`/api/payments/config/${university}/admin`)
+      .then((res) => res.json())
+      .then((data) => {
+        setConfig(data)
+        setEnvironment(data.environment ?? 'sandbox')
+        setTillNumber(data.tillNumber ?? '')
+        setApiKey('')
+        setWebhookSecret('')
+      })
+      .catch(() => setConfig({ configured: false }))
+  }, [university])
+
+  const flash = (text) => {
+    setMsg(text)
+    setTimeout(() => setMsg(null), 2500)
+  }
+
+  const saveConfig = async () => {
+    setBusy(true)
+    try {
+      const body = {
+        environment,
+        tillNumber: tillNumber.trim() || null,
+      }
+      if (apiKey.trim()) body.apiKey = apiKey.trim()
+      if (webhookSecret.trim()) body.webhookSecret = webhookSecret.trim()
+
+      const res = await api(`/api/payments/config/${university}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        flash('Payment config saved')
+        // Reload config
+        const updated = await api(`/api/payments/config/${university}/admin`).then(r => r.json())
+        setConfig(updated)
+        setApiKey('')
+        setWebhookSecret('')
+      } else {
+        flash('Failed to save — are you logged in?')
+      }
+    } catch {
+      flash('Failed to save')
+    }
+    setBusy(false)
+  }
+
+  const handleSave = () => {
+    if (role === 'subuser') {
+      setSuperuserPrompt(true)
+      setPendingSave(true)
+    } else {
+      saveConfig()
+    }
+  }
+
+  const webhookUrl = `${baseUrl}/api/payments/webhook/${university}`
+
+  if (!config) return <div className="admin-panel"><p>Loading...</p></div>
+
+  if (role === 'subuser') {
+    return (
+      <div className="admin-panel">
+        <h2>Payment Status</h2>
+        <div style={{ marginTop: '1rem' }}>
+          <p>
+            <strong>M-Pesa payments:</strong>{' '}
+            {config.configured ? (
+              <span style={{ color: '#16a34a' }}>Configured</span>
+            ) : (
+              <span style={{ color: '#dc2626' }}>Not configured</span>
+            )}
+          </p>
+          {config.configured && (
+            <>
+              <p><strong>Environment:</strong> {config.environment}</p>
+              {config.tillNumber && <p><strong>Till number:</strong> {config.tillNumber}</p>}
+            </>
+          )}
+          <p style={{ marginTop: '1rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            Contact the super admin to configure payment settings.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="admin-panel">
+      <div className="admin-panel-head">
+        <div>
+          <h2>Payment Settings</h2>
+          <p className="panel-hint">Configure Lipana M-Pesa for this university. Each university uses its own till account.</p>
+        </div>
+      </div>
+
+      {msg && <p style={{ padding: '0.5rem 1rem', background: '#f0fdf4', borderRadius: '8px', marginBottom: '1rem', color: '#166534' }}>{msg}</p>}
+
+      <div style={{ display: 'grid', gap: '1.25rem', maxWidth: '500px' }}>
+        <label className="form-field">
+          <span>Lipana API Key</span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type={showApiKey ? 'text' : 'password'}
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder={config.apiKeyPreview ? `Existing key ends with ${config.apiKeyPreview}` : 'lip_sk_live_... or lip_sk_test_...'}
+              style={{ flex: 1 }}
+            />
+            <button type="button" className="btn ghost small" onClick={() => setShowApiKey(!showApiKey)}>
+              {showApiKey ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          {config.apiKeyPreview && !apiKey && (
+            <small style={{ color: 'var(--text-secondary)' }}>Current: {config.apiKeyPreview}</small>
+          )}
+        </label>
+
+        <label className="form-field">
+          <span>Webhook Secret</span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type={showWebhookSecret ? 'text' : 'password'}
+              value={webhookSecret}
+              onChange={(e) => setWebhookSecret(e.target.value)}
+              placeholder={config.hasWebhookSecret ? '•••••••• (set, leave blank to keep)' : 'whsec_...'}
+              style={{ flex: 1 }}
+            />
+            <button type="button" className="btn ghost small" onClick={() => setShowWebhookSecret(!showWebhookSecret)}>
+              {showWebhookSecret ? 'Hide' : 'Show'}
+            </button>
+          </div>
+        </label>
+
+        <label className="form-field">
+          <span>Till Number</span>
+          <input
+            type="text"
+            value={tillNumber}
+            onChange={(e) => setTillNumber(e.target.value)}
+            placeholder="e.g. 123456"
+          />
+          <small style={{ color: 'var(--text-secondary)' }}>Optional — displayed to university admin</small>
+        </label>
+
+        <label className="form-field">
+          <span>Environment</span>
+          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.25rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+              <input type="radio" name="env" value="sandbox" checked={environment === 'sandbox'} onChange={() => setEnvironment('sandbox')} />
+              Sandbox (testing)
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+              <input type="radio" name="env" value="production" checked={environment === 'production'} onChange={() => setEnvironment('production')} />
+              Production (live)
+            </label>
+          </div>
+        </label>
+
+        <div style={{ marginTop: '0.5rem' }}>
+          <label className="form-field">
+            <span>Webhook URL</span>
+            <input
+              type="text"
+              value={webhookUrl}
+              readOnly
+              style={{ background: 'var(--bg-secondary)', cursor: 'not-allowed' }}
+              onClick={(e) => { navigator.clipboard.writeText(webhookUrl); e.target.select() }}
+            />
+            <small style={{ color: 'var(--text-secondary)' }}>Configure this URL in your Lipana dashboard. Click to copy.</small>
+          </label>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+          <button type="button" className="btn" onClick={handleSave} disabled={busy}>
+            {busy ? 'Saving...' : 'Save payment config'}
+          </button>
+          {config.configured && (
+            <span style={{ alignSelf: 'center', color: '#16a34a', fontSize: '0.9rem' }}>
+              Configured ({config.environment})
+            </span>
+          )}
+        </div>
+      </div>
+
+      <SuperuserPasswordPrompt
+        open={superuserPrompt}
+        onClose={() => { setSuperuserPrompt(false); setPendingSave(false) }}
+        onVerified={(ok) => {
+          if (ok && pendingSave) saveConfig()
+          setSuperuserPrompt(false)
+          setPendingSave(false)
+        }}
       />
     </div>
   )

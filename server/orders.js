@@ -6,6 +6,37 @@ import { config } from './config.js'
 
 const STATUSES = ['pending', 'confirmed', 'canceled', 'delivered']
 
+// ---------- Stock helpers (shared with payment-routes.js) ----------
+
+export async function deductStock(order) {
+  const items = order.items ?? []
+  for (const item of items) {
+    if (!item.id) continue
+    const qty = item.qty ?? 1
+    await pool.query(
+      `UPDATE products SET quantity = GREATEST(quantity - $1, 0),
+       out_of_stock = CASE WHEN quantity - $1 <= 0 THEN true ELSE out_of_stock END
+       WHERE id = $2 AND active = true`,
+      [qty, item.id]
+    )
+  }
+  process.emit('invalidate-data-cache')
+}
+
+export async function restoreStock(order) {
+  const items = order.items ?? []
+  for (const item of items) {
+    if (!item.id) continue
+    const qty = item.qty ?? 1
+    await pool.query(
+      `UPDATE products SET quantity = quantity + $1, out_of_stock = false
+       WHERE id = $2 AND active = true`,
+      [qty, item.id]
+    )
+  }
+  process.emit('invalidate-data-cache')
+}
+
 async function getNotifyEmail(university) {
   if (!university) return config.adminEmail || null
   try {
@@ -296,33 +327,12 @@ orderAdminRouter.put('/:id/payment', async (req, res) => {
 
   // Subtract stock when marking as paid (only if not already paid)
   if (payment_status === 'paid' && order.payment_status !== 'paid') {
-    const items = order.items ?? []
-    for (const item of items) {
-      if (!item.id) continue
-      const qty = item.qty ?? 1
-      await pool.query(
-        `UPDATE products SET quantity = GREATEST(quantity - $1, 0),
-         out_of_stock = CASE WHEN quantity - $1 <= 0 THEN true ELSE out_of_stock END
-         WHERE id = $2 AND active = true`,
-        [qty, item.id]
-      )
-    }
-    process.emit('invalidate-data-cache')
+    await deductStock(order)
   }
 
   // Restore stock if un-marking as paid (revert the deduction)
   if (payment_status !== 'paid' && order.payment_status === 'paid') {
-    const items = order.items ?? []
-    for (const item of items) {
-      if (!item.id) continue
-      const qty = item.qty ?? 1
-      await pool.query(
-        `UPDATE products SET quantity = quantity + $1, out_of_stock = false
-         WHERE id = $2 AND active = true`,
-        [qty, item.id]
-      )
-    }
-    process.emit('invalidate-data-cache')
+    await restoreStock(order)
   }
 
   const result = await pool.query(

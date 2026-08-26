@@ -157,6 +157,11 @@ export async function initDb() {
   await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS email TEXT")
   // University notify email migration
   await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS notify_email TEXT")
+  // Lipana payment credentials per university
+  await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS lipana_api_key TEXT")
+  await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS lipana_webhook_secret TEXT")
+  await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS lipana_environment TEXT DEFAULT 'sandbox'")
+  await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS lipana_till_number TEXT")
   // University column on products
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS university TEXT")
   // Sync out_of_stock flag with quantity

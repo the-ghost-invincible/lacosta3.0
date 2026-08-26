@@ -12,7 +12,7 @@ import { initDb, pool } from './db.js'
 import { authRouter, userFromSession } from './auth.js'
 import { cartRouter } from './cart.js'
 import { orderRouter, orderAdminRouter, getCustomers } from './orders.js'
-import { paymentRouter } from './payment-routes.js'
+import { paymentRouter, getPaymentConfigAdmin, savePaymentConfigAdmin } from './payment-routes.js'
 import { errorHandler } from './error-tracker.js'
 import { seoRouter } from './seo.js'
 
@@ -295,6 +295,10 @@ app.get('/api/admin/data', requireAnyAdmin, async (req, res) => {
 
 // ---------- Payments ----------
 app.use('/api/payments', paymentRouter)
+
+// ---------- Admin: payment config per university ----------
+app.get('/api/payments/config/:university/admin', requireAnyAdmin, getPaymentConfigAdmin)
+app.put('/api/payments/config/:university', requireAnyAdmin, savePaymentConfigAdmin)
 
 // ---------- SEO (sitemap, robots.txt) ----------
 app.use(seoRouter)

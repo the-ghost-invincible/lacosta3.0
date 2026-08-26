@@ -1,69 +1,102 @@
 import { describe, it, expect } from 'vitest'
-import { parseCallback, isConfigured } from '../payments.js'
+import crypto from 'node:crypto'
+import { parseWebhookPayload, verifyWebhookSignature, normalizePhone } from '../payments.js'
 
-describe('parseCallback', () => {
-  it('parses a successful M-Pesa callback', () => {
-    const body = {
-      Body: {
-        stkCallback: {
-          MerchantRequestID: 'mr-001',
-          CheckoutRequestID: 'ws_CO_123',
-          ResultCode: 0,
-          ResultDesc: 'Success',
-          CallbackMetadata: {
-            Item: [
-              { Name: 'Amount', Value: 1000 },
-              { Name: 'MpesaReceiptNumber', Value: 'QHK73G5YZ0' },
-              { Name: 'Balance', Value: 0 },
-              { Name: 'TransactionDate', Value: 20260821190000 },
-              { Name: 'PhoneNumber', Value: 254712345678 },
-            ],
-          },
-        },
-      },
-    }
-
-    const result = parseCallback(body)
-    expect(result).toEqual({
-      merchantRequestId: 'mr-001',
-      checkoutRequestId: 'ws_CO_123',
-      resultCode: 0,
-      resultDesc: 'Success',
-      amount: 1000,
-      mpesaReceiptNumber: 'QHK73G5YZ0',
-      balance: 0,
-      transactionDate: 20260821190000,
-      phoneNumber: 254712345678,
-    })
+describe('normalizePhone', () => {
+  it('converts 07xx to +254', () => {
+    expect(normalizePhone('0712345678')).toBe('+254712345678')
   })
 
-  it('returns null for invalid body', () => {
-    expect(parseCallback(null)).toBeNull()
-    expect(parseCallback({})).toBeNull()
-    expect(parseCallback({ Body: {} })).toBeNull()
+  it('handles +254 prefix', () => {
+    expect(normalizePhone('+254712345678')).toBe('+254712345678')
   })
 
-  it('handles failed callback (ResultCode != 0)', () => {
-    const body = {
-      Body: {
-        stkCallback: {
-          MerchantRequestID: 'mr-002',
-          CheckoutRequestID: 'ws_CO_456',
-          ResultCode: 1032,
-          ResultDesc: 'Request cancelled by user',
-        },
-      },
-    }
+  it('handles 254 prefix without +', () => {
+    expect(normalizePhone('254712345678')).toBe('+254712345678')
+  })
 
-    const result = parseCallback(body)
-    expect(result.resultCode).toBe(1032)
-    expect(result.mpesaReceiptNumber).toBeUndefined()
+  it('strips spaces and dashes', () => {
+    expect(normalizePhone('0712 345 678')).toBe('+254712345678')
+    expect(normalizePhone('0712-345-678')).toBe('+254712345678')
+  })
+
+  it('handles leading 0 with country code', () => {
+    expect(normalizePhone('0112974286')).toBe('+254112974286')
   })
 })
 
-describe('isConfigured', () => {
-  it('returns false when env vars are missing', () => {
-    // In test env, MPESA vars are not set
-    expect(isConfigured()).toBe(false)
+describe('parseWebhookPayload', () => {
+  it('parses a standard webhook payload', () => {
+    const body = {
+      data: {
+        transactionId: 'tx_abc123',
+        status: 'completed',
+        amount: 2500,
+        phoneNumber: '+254712345678',
+        receipt: 'QHK73G5YZ0',
+        accountReference: 'ORD-42',
+        timestamp: '2026-08-26T10:00:00Z',
+      },
+    }
+
+    const result = parseWebhookPayload(body)
+    expect(result).toEqual({
+      transactionId: 'tx_abc123',
+      status: 'completed',
+      amount: 2500,
+      phoneNumber: '+254712345678',
+      receipt: 'QHK73G5YZ0',
+      accountReference: 'ORD-42',
+      timestamp: '2026-08-26T10:00:00Z',
+      raw: body,
+    })
+  })
+
+  it('parses flat payload format', () => {
+    const body = {
+      transactionId: 'tx_flat',
+      status: 'success',
+      amount: 1000,
+    }
+
+    const result = parseWebhookPayload(body)
+    expect(result.transactionId).toBe('tx_flat')
+    expect(result.status).toBe('success')
+  })
+
+  it('returns null for null/empty body', () => {
+    expect(parseWebhookPayload(null)).toBeNull()
+    expect(parseWebhookPayload(undefined)).toBeNull()
+  })
+
+  it('handles missing fields gracefully', () => {
+    const result = parseWebhookPayload({ data: {} })
+    expect(result.transactionId).toBeNull()
+    expect(result.status).toBeNull()
+    expect(result.amount).toBeNull()
+  })
+})
+
+describe('verifyWebhookSignature', () => {
+  it('returns true for valid signature', () => {
+    const secret = 'whsec_test123'
+    const payload = '{"transactionId":"tx_123"}'
+    const signature = crypto.createHmac('sha256', secret).update(payload).digest('hex')
+
+    expect(verifyWebhookSignature(payload, signature, secret)).toBe(true)
+  })
+
+  it('returns false for invalid signature', () => {
+    expect(verifyWebhookSignature('{"test":true}', 'invalid_sig', 'secret')).toBe(false)
+  })
+
+  it('returns false when secret is missing', () => {
+    expect(verifyWebhookSignature('payload', 'sig', '')).toBe(false)
+    expect(verifyWebhookSignature('payload', 'sig', null)).toBe(false)
+  })
+
+  it('returns false when signature is missing', () => {
+    expect(verifyWebhookSignature('payload', '', 'secret')).toBe(false)
+    expect(verifyWebhookSignature('payload', null, 'secret')).toBe(false)
   })
 })

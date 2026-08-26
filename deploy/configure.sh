@@ -38,22 +38,18 @@ if [[ -n "$RESEND_KEY" ]]; then
   log "RESEND_API_KEY updated"
 fi
 
-# --- M-Pesa ---
+# --- Lipana M-Pesa ---
 echo ""
-echo "── M-Pesa (Safaricom Daraja) ──"
-echo "Get credentials from https://developer.safaricom.co.ke"
-read -p "Enter MPESA_CONSUMER_KEY (leave blank to skip): " MPESA_KEY
-read -p "Enter MPESA_CONSUMER_SECRET: " MPESA_SECRET
-read -p "Enter MPESA_SHORTCODE: " MPESA_SHORTCODE
-read -p "Enter MPESA_PASSKEY: " MPESA_PASSKEY
-
-if [[ -n "$MPESA_KEY" ]]; then
-  sed -i "s|^MPESA_CONSUMER_KEY=.*|MPESA_CONSUMER_KEY=$MPESA_KEY|" "$ENV_FILE"
-  sed -i "s|^MPESA_CONSUMER_SECRET=.*|MPESA_CONSUMER_SECRET=$MPESA_SECRET|" "$ENV_FILE"
-  sed -i "s|^MPESA_SHORTCODE=.*|MPESA_SHORTCODE=$MPESA_SHORTCODE|" "$ENV_FILE"
-  sed -i "s|^MPESA_PASSKEY=.*|MPESA_PASSKEY=$MPESA_PASSKEY|" "$ENV_FILE"
-  log "M-Pesa credentials updated"
-fi
+echo "── M-Pesa (Lipana) ──"
+echo "Payment credentials are now configured per-university in the admin panel."
+echo "After deployment, go to Admin → Payments tab to configure each university's Lipana keys."
+echo ""
+echo "Steps:"
+echo "  1. Sign up at https://lipana.dev"
+echo "  2. Get your API key from the Lipana dashboard"
+echo "  3. In the admin panel, go to Payments tab for each university"
+echo "  4. Enter the API key, webhook secret, and environment"
+echo "  5. Copy the webhook URL and add it to your Lipana dashboard"
 
 # --- Restart ---
 echo ""

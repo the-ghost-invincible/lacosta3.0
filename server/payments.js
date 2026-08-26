@@ -1,140 +1,156 @@
-// M-Pesa Daraja API configuration
-const DARAJA_BASE = process.env.DARAJA_BASE_URL ?? 'https://sandbox.safaricom.co.ke'
-const CONSUMER_KEY = process.env.MPESA_CONSUMER_KEY ?? ''
-const CONSUMER_SECRET = process.env.MPESA_CONSUMER_SECRET ?? ''
-const SHORTCODE = process.env.MPESA_SHORTCODE ?? ''
-const PASSKEY = process.env.MPESA_PASSKEY ?? ''
-const CALLBACK_URL = process.env.MPESA_CALLBACK_URL ?? ''
+import { Lipana } from '@lipana/sdk'
+import crypto from 'node:crypto'
+import { pool } from './db.js'
 
-let cachedToken = null
-let tokenExpiry = 0
+// Cache Lipana clients per university (re-initialized if credentials change)
+const clientCache = new Map()
 
-// ---------- Authentication ----------
+// ---------- Phone normalization ----------
 
-async function getAccessToken() {
-  if (cachedToken && Date.now() < tokenExpiry) return cachedToken
-
-  const credentials = Buffer.from(`${CONSUMER_KEY}:${CONSUMER_SECRET}`).toString('base64')
-  const res = await fetch(`${DARAJA_BASE}/oauth/v1/generate?grant_type=client_credentials`, {
-    headers: { Authorization: `Basic ${credentials}` },
-  })
-
-  if (!res.ok) throw new Error(`M-Pesa auth failed: ${res.status}`)
-  const data = await res.json()
-  cachedToken = data.access_token
-  tokenExpiry = Date.now() + (data.expires_in - 60) * 1000 // refresh 60s early
-  return cachedToken
-}
-
-// ---------- STK Push (Lipa Na M-Pesa Online) ----------
-
-function generatePassword() {
-  const timestamp = new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14)
-  const raw = `${SHORTCODE}${PASSKEY}${timestamp}`
-  const password = Buffer.from(raw).toString('base64')
-  return { timestamp, password }
-}
-
-export async function initiateSTKPush({ phone, amount, accountRef, description }) {
-  const token = await getAccessToken()
-  const { timestamp, password } = generatePassword()
-
-  // Normalize phone: strip +, leading 0 → 254
+export function normalizePhone(phone) {
   let msisdn = String(phone).replace(/[\s-]/g, '')
-  if (msisdn.startsWith('0')) msisdn = '254' + msisdn.slice(1)
-  if (!msisdn.startsWith('254')) msisdn = '254' + msisdn
+  if (msisdn.startsWith('+')) return msisdn
+  if (msisdn.startsWith('0')) return '+254' + msisdn.slice(1)
+  if (!msisdn.startsWith('254')) return '+254' + msisdn
+  return '+' + msisdn
+}
 
-  const body = {
-    BusinessShortCode: SHORTCODE,
-    Password: password,
-    Timestamp: timestamp,
-    TransactionType: 'CustomerPayBillOnline',
-    Amount: Math.round(Number(amount)),
-    PartyA: msisdn,
-    PartyB: SHORTCODE,
-    PhoneNumber: msisdn,
-    CallBackURL: CALLBACK_URL,
-    AccountReference: accountRef ?? 'Lacosta',
-    TransactionDesc: description ?? 'Lacosta order payment',
+// ---------- University credential lookup ----------
+
+export async function getUniversityPaymentConfig(university) {
+  if (!university) return null
+  try {
+    const result = await pool.query(
+      'SELECT lipana_api_key, lipana_webhook_secret, lipana_environment, lipana_till_number FROM universities WHERE slug = $1',
+      [university]
+    )
+    return result.rows[0] || null
+  } catch {
+    return null
+  }
+}
+
+// ---------- Lipana client factory ----------
+
+function getLipanaClient(apiKey, environment) {
+  const cacheKey = `${apiKey}:${environment}`
+  if (clientCache.has(cacheKey)) return clientCache.get(cacheKey)
+
+  const client = new Lipana({
+    apiKey,
+    environment: environment === 'production' ? 'production' : 'sandbox',
+  })
+  clientCache.set(cacheKey, client)
+
+  // Evict after 1 hour (in case keys rotate)
+  setTimeout(() => clientCache.delete(cacheKey), 3600_000)
+  return client
+}
+
+export function invalidateClientCache(_university) {
+  // Clear all cached clients (safe — they'll be recreated on next use)
+  clientCache.clear()
+}
+
+// ---------- STK Push ----------
+
+export async function initiateSTKPush({ phone, amount, accountRef, description, university }) {
+  const config = await getUniversityPaymentConfig(university)
+  if (!config?.lipana_api_key) {
+    throw new Error('M-Pesa is not configured for this university')
   }
 
-  const res = await fetch(`${DARAJA_BASE}/mpesa/stkpush/v1/processrequest`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
+  const client = getLipanaClient(config.lipana_api_key, config.lipana_environment)
+  const normalizedPhone = normalizePhone(phone)
+  const roundedAmount = Math.round(Number(amount))
+
+  if (roundedAmount < 10) {
+    throw new Error('Minimum payment amount is KSh 10')
+  }
+
+  const result = await client.transactions.initiateStkPush({
+    phone: normalizedPhone,
+    amount: roundedAmount,
+    accountReference: accountRef ?? 'Lacosta',
+    transactionDesc: description ?? 'Lacosta order payment',
   })
 
-  const data = await res.json()
-  if (data.ResponseCode !== '0') {
-    throw new Error(data.CustomerMessage ?? data.errorMessage ?? 'STK push failed')
-  }
   return {
-    checkoutRequestId: data.CheckoutRequestID,
-    merchantRequestId: data.MerchantRequestID,
-    responseCode: data.ResponseCode,
-    customerMessage: data.CustomerMessage,
+    transactionId: result.transactionId ?? result.id ?? null,
+    checkoutRequestId: result.checkoutRequestId ?? result.transactionId ?? result.id ?? null,
+    customerMessage: result.customerMessage ?? result.message ?? 'STK push sent',
+    raw: result,
   }
 }
 
 // ---------- Query transaction status ----------
 
-export async function querySTKStatus(checkoutRequestId) {
-  const token = await getAccessToken()
-  const { timestamp, password } = generatePassword()
-
-  const res = await fetch(`${DARAJA_BASE}/mpesa/stkpushquery/v1/query`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      BusinessShortCode: SHORTCODE,
-      Password: password,
-      Timestamp: timestamp,
-      CheckoutRequestID: checkoutRequestId,
-    }),
-  })
-
-  return await res.json()
-}
-
-// ---------- Callback parsing ----------
-
-export function parseCallback(body) {
-  const result = body?.Body?.stkCallback
-  if (!result) return null
-
-  const meta = {}
-  for (const item of result.CallbackMetadata?.Item ?? []) {
-    meta[item.Name] = item.Value
+export async function queryTransactionStatus(transactionId, university) {
+  const config = await getUniversityPaymentConfig(university)
+  if (!config?.lipana_api_key) {
+    throw new Error('M-Pesa is not configured for this university')
   }
 
+  const client = getLipanaClient(config.lipana_api_key, config.lipana_environment)
+
+  try {
+    const result = await client.transactions.get(transactionId)
+    return result
+  } catch {
+    // Fallback: try listing transactions and filtering
+    return { status: 'unknown', transactionId }
+  }
+}
+
+// ---------- Webhook signature verification ----------
+
+export function verifyWebhookSignature(payload, signature, webhookSecret) {
+  if (!webhookSecret || !signature) return false
+  try {
+    const expected = crypto
+      .createHmac('sha256', webhookSecret)
+      .update(typeof payload === 'string' ? payload : JSON.stringify(payload))
+      .digest('hex')
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+  } catch {
+    return false
+  }
+}
+
+// ---------- Parse webhook payload ----------
+
+export function parseWebhookPayload(body) {
+  if (!body) return null
+
+  // Handle different possible Lipana webhook formats
+  const data = body.data ?? body
+
   return {
-    merchantRequestId: result.MerchantRequestID,
-    checkoutRequestId: result.CheckoutRequestID,
-    resultCode: result.ResultCode,
-    resultDesc: result.ResultDesc,
-    amount: meta.Amount,
-    mpesaReceiptNumber: meta.MpesaReceiptNumber,
-    balance: meta.Balance,
-    transactionDate: meta.TransactionDate,
-    phoneNumber: meta.PhoneNumber,
+    transactionId: data.transactionId ?? data.id ?? data.TransactionID ?? null,
+    status: data.status ?? data.Status ?? data.resultCode ?? null,
+    amount: data.amount ?? data.Amount ?? null,
+    phoneNumber: data.phoneNumber ?? data.PhoneNumber ?? data.phone ?? null,
+    receipt: data.receipt ?? data.MpesaReceiptNumber ?? data.mpesaReceiptNumber ?? null,
+    accountReference: data.accountReference ?? data.AccountReference ?? null,
+    timestamp: data.timestamp ?? data.Timestamp ?? data.transactionDate ?? null,
+    raw: body,
   }
 }
 
 // ---------- Validation ----------
 
-export function isConfigured() {
-  return Boolean(CONSUMER_KEY && CONSUMER_SECRET && SHORTCODE && PASSKEY && CALLBACK_URL)
+export function isConfigured(university) {
+  return getUniversityPaymentConfig(university).then(
+    (config) => Boolean(config?.lipana_api_key),
+    () => false
+  )
 }
 
-export function getConfig() {
+export async function getConfig(university) {
+  const config = await getUniversityPaymentConfig(university)
   return {
-    configured: isConfigured(),
-    sandbox: DARAJA_BASE.includes('sandbox'),
+    configured: Boolean(config?.lipana_api_key),
+    environment: config?.lipana_environment ?? 'sandbox',
+    tillNumber: config?.lipana_till_number ?? null,
   }
 }
