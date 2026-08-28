@@ -711,7 +711,7 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
               <ProductsTab products={db.catalogProducts} onSave={(v) => save('catalogProducts', v)} />
             )}
             {tab === 'customers' && (
-              <CustomersTab university={selectedUni} />
+              <CustomersTab university={selectedUni} role={role} />
             )}
             {tab === 'orders' && (
               <OrdersTab university={selectedUni} role={role} />
@@ -1066,13 +1066,18 @@ function ProductsTab({ products, onSave }) {
 const STATUS_LABELS = { pending: 'Pending', confirmed: 'Confirmed', canceled: 'Canceled', delivered: 'Delivered' }
 const PAYMENT_STATUS_LABELS = { pending: 'Unpaid', paid: 'Paid', failed: 'Failed' }
 
-function CustomersTab({ university }) {
+function CustomersTab({ university, role }) {
   const [customers, setCustomers] = useState([])
   const [refreshing, setRefreshing] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deletePassword, setDeletePassword] = useState('')
   const [deleteError, setDeleteError] = useState(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
+  const [uniTarget, setUniTarget] = useState(null)
+  const [uniList, setUniList] = useState([])
+  const [uniNew, setUniNew] = useState('')
+  const [uniBusy, setUniBusy] = useState(false)
+  const [uniError, setUniError] = useState(null)
 
   const load = async () => {
     setRefreshing(true)
@@ -1113,6 +1118,42 @@ function CustomersTab({ university }) {
       setDeleteError('Network error')
     }
     setDeleteBusy(false)
+  }
+
+  const openUniModal = async (customer) => {
+    setUniTarget(customer)
+    setUniNew('')
+    setUniError(null)
+    if (uniList.length === 0) {
+      try {
+        const res = await api('/api/universities')
+        const data = await res.json()
+        setUniList(data.universities ?? [])
+      } catch {}
+    }
+  }
+
+  const changeUniversity = async () => {
+    if (!uniTarget || !uniNew) return
+    setUniBusy(true)
+    setUniError(null)
+    try {
+      const res = await api(`/api/admin/customers/${uniTarget.id}/university`, {
+        method: 'PUT',
+        body: JSON.stringify({ university: uniNew }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setCustomers((prev) => prev.filter((c) => c.id !== uniTarget.id))
+        setUniTarget(null)
+        setUniNew('')
+      } else {
+        setUniError(data.error ?? 'Failed')
+      }
+    } catch {
+      setUniError('Network error')
+    }
+    setUniBusy(false)
   }
 
   const parsePrice = (price) => Number(String(price ?? '').replace(/[^\d]/g, '')) || 0
@@ -1173,7 +1214,17 @@ function CustomersTab({ university }) {
                     </td>
                     <td className="nowrap">{items.length ? `KSh ${cartTotal(items).toLocaleString()}` : '—'}</td>
                     <td className="nowrap muted">{fmtTime(c.lastActive)}</td>
-                    <td className="nowrap">
+                    <td className="nowrap" style={{ display: 'flex', gap: '0.4rem' }}>
+                      {role === 'superuser' && (
+                        <button
+                          type="button"
+                          className="btn small"
+                          style={{ background: 'var(--accent)', color: '#fff' }}
+                          onClick={() => openUniModal(c)}
+                        >
+                          Change Univ
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn danger small"
@@ -1210,6 +1261,37 @@ function CustomersTab({ university }) {
               <button type="button" className="btn ghost" onClick={() => setDeleteTarget(null)}>Cancel</button>
               <button type="button" className="btn danger" disabled={deleteBusy || !deletePassword} onClick={deleteUser}>
                 {deleteBusy ? 'Deleting…' : 'Delete user'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {uniTarget && (
+        <div className="admin-modal-overlay" onClick={() => setUniTarget(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Change university</h2>
+            <p>Move <strong>{uniTarget.displayName || uniTarget.username || uniTarget.email}</strong> from <strong>{uniTarget.university}</strong> to another university. Their cart will be cleared.</p>
+            <label className="form-field">
+              <span>New university</span>
+              <select
+                value={uniNew}
+                onChange={(e) => setUniNew(e.target.value)}
+                autoFocus
+              >
+                <option value="">Select university…</option>
+                {uniList.map((u) => (
+                  <option key={u.slug} value={u.slug} disabled={u.slug === uniTarget.university}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {uniError && <p className="error">{uniError}</p>}
+            <div className="form-actions">
+              <button type="button" className="btn ghost" onClick={() => setUniTarget(null)}>Cancel</button>
+              <button type="button" className="btn" disabled={uniBusy || !uniNew} onClick={changeUniversity}>
+                {uniBusy ? 'Moving…' : 'Move user'}
               </button>
             </div>
           </div>

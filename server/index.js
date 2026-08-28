@@ -279,6 +279,34 @@ app.get('/api/stock/reserved', async (req, res) => {
 // ---------- Orders ----------
 app.use('/api/orders', orderRouter)
 app.get('/api/admin/customers', requireAnyAdmin, getCustomers)
+
+app.put('/api/admin/customers/:id/university', requireAnyAdmin, async (req, res) => {
+  if (req.adminRole !== 'superuser') {
+    return res.status(403).json({ error: 'Only superusers can change customer university' })
+  }
+  const { id } = req.params
+  const { university } = req.body ?? {}
+  if (!university) {
+    return res.status(400).json({ error: 'university is required' })
+  }
+  try {
+    const check = await pool.query('SELECT id, university FROM users WHERE id = $1', [id])
+    if (check.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+    if (check.rows[0].university === university) {
+      return res.status(400).json({ error: 'User is already at that university' })
+    }
+    await pool.query('UPDATE users SET university = $1 WHERE id = $2', [university, id])
+    await pool.query('UPDATE carts SET items = \'[]\' WHERE user_id = $1', [id])
+    siteDataCache = null
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('Change customer university failed:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 app.use('/api/admin/orders', requireAnyAdmin, orderAdminRouter)
 
 // ---------- Admin: data for specific university ----------
