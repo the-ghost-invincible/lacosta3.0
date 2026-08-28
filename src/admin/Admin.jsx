@@ -536,6 +536,7 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
     { id: 'categories', label: 'Categories' },
     { id: 'menus', label: 'Subcategories' },
     { id: 'content', label: 'Site content' },
+    ...(role === 'superuser' ? [{ id: 'sales', label: 'Daily Sales' }] : []),
   ]
   const tabs = allTabs
 
@@ -749,6 +750,9 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
                 }}
               />
             )}
+            {tab === 'sales' && role === 'superuser' && (
+              <DailySalesTab university={selectedUni} />
+            )}
           </>
         )}
       </main>
@@ -920,6 +924,8 @@ function emptyProduct() {
     category: '',
     price: '',
     oldPrice: '',
+    priceNum: 0,
+    oldPriceNum: '',
     image: '',
     images: [],
     seller: '',
@@ -936,7 +942,9 @@ function emptyProduct() {
 function ProductForm({ initial, categories, onSave, onCancel }) {
   const [product, setProduct] = useState(() => {
     const imgs = initial.images?.length ? initial.images : (initial.image ? [initial.image] : [])
-    return { ...initial, images: imgs }
+    const priceNum = (initial.priceNum ?? parseFloat(String(initial.price ?? '').replace(/[^\d.]/g, ''))) || 0
+    const oldPriceNum = initial.oldPriceNum ?? (initial.oldPrice ? parseFloat(String(initial.oldPrice).replace(/[^\d.]/g, '')) : '')
+    return { ...initial, images: imgs, priceNum, oldPriceNum }
   })
   const set = (key, value) => setProduct((prev) => ({ ...prev, [key]: value }))
 
@@ -965,8 +973,14 @@ function ProductForm({ initial, categories, onSave, onCancel }) {
   }
 
   const submit = () => {
+    const priceNum = parseFloat(product.priceNum) || 0
+    const oldPriceNum = product.oldPriceNum !== '' && product.oldPriceNum != null ? parseFloat(product.oldPriceNum) : null
     const next = {
       ...product,
+      price_num: priceNum,
+      old_price_num: oldPriceNum,
+      price: priceNum > 0 ? `KSh ${priceNum.toLocaleString()}` : '',
+      oldPrice: oldPriceNum != null && oldPriceNum > 0 ? `KSh ${oldPriceNum.toLocaleString()}` : '',
       specs: (product.specs || []).join(',').split(',').map((s) => s.trim()).filter(Boolean),
       image: product.images[0] ?? product.image ?? '',
     }
@@ -1006,12 +1020,25 @@ function ProductForm({ initial, categories, onSave, onCancel }) {
           </small>
         </div>
         <div className="form-field">
-          <label>Price</label>
-          <input value={product.price} onChange={(e) => set('price', e.target.value)} placeholder="KSh 150" />
+          <label>Price (KSh)</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
+            <span style={{ padding: '0.6rem 0.75rem', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: '8px 0 0 8px', fontSize: '0.85rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>KSh</span>
+            <input type="number" min="0" step="0.01" style={{ borderRadius: '0 8px 8px 0' }} value={product.priceNum ?? ''} onChange={(e) => set('priceNum', e.target.value)} placeholder="0" />
+          </div>
         </div>
         <div className="form-field">
-          <label>Old price (strikethrough)</label>
-          <input value={product.oldPrice ?? ''} onChange={(e) => set('oldPrice', e.target.value)} placeholder="KSh 200" />
+          <label>Old price (KSh, strikethrough)</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
+            <span style={{ padding: '0.6rem 0.75rem', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: '8px 0 0 8px', fontSize: '0.85rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>KSh</span>
+            <input type="number" min="0" step="0.01" style={{ borderRadius: '0 8px 8px 0' }} value={product.oldPriceNum ?? ''} onChange={(e) => set('oldPriceNum', e.target.value)} placeholder="0" />
+          </div>
+        </div>
+        <div className="form-field">
+          <label>Quantity in stock</label>
+          <input type="number" min="0" value={product.quantity ?? 0} onChange={(e) => set('quantity', Math.max(0, parseInt(e.target.value) || 0))} />
+          <small className="muted" style={{ display: 'block', marginTop: '4px' }}>
+            Stock will be subtracted automatically when an order is marked as paid.
+          </small>
         </div>
         <div className="form-field">
           <label>Seller</label>
@@ -1044,13 +1071,6 @@ function ProductForm({ initial, categories, onSave, onCancel }) {
         <div className="form-field full">
           <label>Specs (comma separated)</label>
           <input value={(product.specs ?? []).join(', ')} onChange={(e) => set('specs', e.target.value.split(',').map((s) => s.trim()))} placeholder="330ml bottle, Carbonated, …" />
-        </div>
-        <div className="form-field">
-          <label>Quantity in stock</label>
-          <input type="number" min="0" value={product.quantity ?? 0} onChange={(e) => set('quantity', Math.max(0, parseInt(e.target.value) || 0))} />
-          <small className="muted" style={{ display: 'block', marginTop: '4px' }}>
-            Stock will be subtracted automatically when an order is marked as paid.
-          </small>
         </div>
         <div className="form-field full">
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
@@ -2315,6 +2335,112 @@ function ContentTab({ deals, trending, benefits, siteContent, onSave }) {
       <div className="form-actions">
         <button type="button" className="btn" onClick={saveAll}>Save all content</button>
       </div>
+    </div>
+  )
+}
+
+function DailySalesTab({ university }) {
+  const [sales, setSales] = useState([])
+  const [days, setDays] = useState(30)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const load = async () => {
+    setRefreshing(true)
+    try {
+      const qs = `?days=${days}${university ? `&university=${encodeURIComponent(university)}` : ''}`
+      const res = await api(`/api/admin/orders/daily-sales${qs}`)
+      const data = await res.json()
+      setSales(data.sales ?? [])
+    } catch {}
+    setRefreshing(false)
+  }
+
+  useEffect(() => {
+    load()
+  }, [days, university])
+
+  const fmt = (n) => `KSh ${(n ?? 0).toLocaleString()}`
+  const fmtDate = (d) => new Date(d + 'T00:00:00').toLocaleDateString(undefined, { dateStyle: 'medium' })
+
+  const totals = sales.reduce((acc, s) => ({
+    orders: acc.orders + s.total_orders,
+    revenue: acc.revenue + s.total_revenue,
+    paidOrders: acc.paidOrders + s.paid_orders,
+    paidRevenue: acc.paidRevenue + s.paid_revenue,
+  }), { orders: 0, revenue: 0, paidOrders: 0, paidRevenue: 0 })
+
+  return (
+    <div className="admin-panel">
+      <div className="admin-panel-head">
+        <div>
+          <h2>Daily Sales</h2>
+          <p className="panel-hint">
+            Revenue tracking — saved per day per university. Only superusers can access this.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <select value={days} onChange={(e) => setDays(Number(e.target.value))} style={{ padding: '0.4rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+            <option value={7}>Last 7 days</option>
+            <option value={14}>Last 14 days</option>
+            <option value={30}>Last 30 days</option>
+            <option value={60}>Last 60 days</option>
+            <option value={90}>Last 90 days</option>
+          </select>
+          <button type="button" className="btn ghost small" onClick={load} disabled={refreshing}>
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ padding: '1rem', borderRadius: '10px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
+          <div className="muted" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Total Orders</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{totals.orders}</div>
+        </div>
+        <div style={{ padding: '1rem', borderRadius: '10px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
+          <div className="muted" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Total Revenue</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#16a34a' }}>{fmt(totals.revenue)}</div>
+        </div>
+        <div style={{ padding: '1rem', borderRadius: '10px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
+          <div className="muted" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Paid Orders</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{totals.paidOrders}</div>
+        </div>
+        <div style={{ padding: '1rem', borderRadius: '10px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
+          <div className="muted" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Paid Revenue</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#16a34a' }}>{fmt(totals.paidRevenue)}</div>
+        </div>
+      </div>
+
+      {sales.length === 0 ? (
+        <p className="muted">No sales data yet. Sales are tracked when orders are placed and paid.</p>
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table orders-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>University</th>
+                <th>Orders</th>
+                <th>Revenue</th>
+                <th>Paid</th>
+                <th>Paid Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sales.map((s) => (
+                <tr key={`${s.university}-${s.sale_date}`}>
+                  <td className="nowrap">{fmtDate(s.sale_date)}</td>
+                  <td>{s.university}</td>
+                  <td>{s.total_orders}</td>
+                  <td className="nowrap">{fmt(s.total_revenue)}</td>
+                  <td>{s.paid_orders}</td>
+                  <td className="nowrap" style={{ color: '#16a34a', fontWeight: 600 }}>{fmt(s.paid_revenue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

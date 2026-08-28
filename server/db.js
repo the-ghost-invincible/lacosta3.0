@@ -166,6 +166,25 @@ export async function initDb() {
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS university TEXT")
   // Multiple images per product
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb")
+  // Numeric price columns (double format)
+  await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_num DOUBLE PRECISION")
+  await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS old_price_num DOUBLE PRECISION")
+  // Migrate existing text prices to numeric
+  await pool.query("UPDATE products SET price_num = CAST(REGEXP_REPLACE(price, '[^0-9.]', '', 'g') AS DOUBLE PRECISION) WHERE price_num IS NULL AND price IS NOT NULL AND price != ''")
+  await pool.query("UPDATE products SET old_price_num = CAST(REGEXP_REPLACE(old_price, '[^0-9.]', '', 'g') AS DOUBLE PRECISION) WHERE old_price_num IS NULL AND old_price IS NOT NULL AND old_price != ''")
+  // Daily sales tracking table
+  await pool.query(`CREATE TABLE IF NOT EXISTS daily_sales (
+    id BIGSERIAL PRIMARY KEY,
+    university TEXT NOT NULL,
+    sale_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    total_orders INTEGER NOT NULL DEFAULT 0,
+    total_revenue DOUBLE PRECISION NOT NULL DEFAULT 0,
+    paid_orders INTEGER NOT NULL DEFAULT 0,
+    paid_revenue DOUBLE PRECISION NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(university, sale_date)
+  )`)
   // Sync out_of_stock flag with quantity
   await pool.query("UPDATE products SET out_of_stock = true WHERE quantity <= 0 AND out_of_stock = false")
   await pool.query("UPDATE products SET out_of_stock = false WHERE quantity > 0 AND out_of_stock = true")

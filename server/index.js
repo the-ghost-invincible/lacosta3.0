@@ -86,14 +86,20 @@ async function readData(university) {
     )
     dbData.catalogProducts = productsResult.rows.map(p => {
       const images = p.images?.length ? p.images : (p.image ? [p.image] : [])
+      const priceNum = (p.price_num ?? parseFloat(String(p.price ?? '').replace(/[^\d.]/g, ''))) || 0
+      const oldPriceNum = p.old_price_num ?? (p.old_price ? parseFloat(String(p.old_price).replace(/[^\d.]/g, '')) : null)
+      const priceFormatted = priceNum > 0 ? `KSh ${priceNum.toLocaleString()}` : p.price ?? ''
+      const oldPriceFormatted = oldPriceNum != null && oldPriceNum > 0 ? `KSh ${oldPriceNum.toLocaleString()}` : p.old_price ?? ''
       return {
         id: p.id,
         name: p.name,
         category: p.category,
         brand: p.brand,
         subcategory: p.subcategory,
-        price: p.price,
-        oldPrice: p.old_price,
+        price: priceFormatted,
+        oldPrice: oldPriceFormatted,
+        priceNum,
+        oldPriceNum,
         seller: p.seller,
         rating: Number(p.rating),
         image: p.image,
@@ -141,26 +147,34 @@ async function writeProduct(product) {
     const university = product.university || 'default'
     const images = product.images?.length ? product.images : (product.image ? [product.image] : [])
     const primaryImage = images[0] ?? product.image ?? null
+    const priceNum = parseFloat(product.price_num) || parseFloat(String(product.price ?? '').replace(/[^\d.]/g, '')) || 0
+    const oldPriceNum = product.old_price_num != null && product.old_price_num !== '' ? parseFloat(product.old_price_num) : null
+    const priceText = priceNum > 0 ? `KSh ${priceNum.toLocaleString()}` : ''
+    const oldPriceText = oldPriceNum != null && oldPriceNum > 0 ? `KSh ${oldPriceNum.toLocaleString()}` : null
     if (product.id) {
       await client.query(
         `UPDATE products SET name = $1, category = $2, brand = $3, subcategory = $4,
-         price = $5, old_price = $6, seller = $7, rating = $8, image = $9,
-         description = $10, specs = $11, badge = $12, out_of_stock = $13, quantity = $14,
-         university = $15, images = $16, updated_at = now()
-         WHERE id = $17`,
+         price = $5, old_price = $6, price_num = $7, old_price_num = $8,
+         seller = $9, rating = $10, image = $11,
+         description = $12, specs = $13, badge = $14, out_of_stock = $15, quantity = $16,
+         university = $17, images = $18, updated_at = now()
+         WHERE id = $19`,
         [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
-         product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
+         priceText, oldPriceText, priceNum, oldPriceNum,
+         product.seller ?? null, product.rating ?? 4.5,
          primaryImage, product.description ?? null, JSON.stringify(product.specs ?? []),
          product.badge ?? null, autoOutOfStock, product.quantity ?? 0, university,
          JSON.stringify(images), product.id]
       )
     } else {
       const result = await client.query(
-        `INSERT INTO products (name, category, brand, subcategory, price, old_price, seller, rating, image, description, specs, badge, out_of_stock, quantity, university, images)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        `INSERT INTO products (name, category, brand, subcategory, price, old_price, price_num, old_price_num,
+         seller, rating, image, description, specs, badge, out_of_stock, quantity, university, images)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
          RETURNING id`,
         [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
-         product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
+         priceText, oldPriceText, priceNum, oldPriceNum,
+         product.seller ?? null, product.rating ?? 4.5,
          primaryImage, product.description ?? null, JSON.stringify(product.specs ?? []),
          product.badge ?? null, autoOutOfStock, product.quantity ?? 0, university,
          JSON.stringify(images)]

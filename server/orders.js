@@ -37,6 +37,57 @@ export async function restoreStock(order) {
   process.emit('invalidate-data-cache')
 }
 
+// ---------- Daily sales tracking ----------
+
+function parsePriceNum(price) {
+  return Number(String(price ?? '').replace(/[^\d.]/g, '')) || 0
+}
+
+export async function trackDailySale(order, paid) {
+  const totalNum = parsePriceNum(order.total)
+  const university = order.university || 'default'
+  const saleDate = new Date(order.created_at).toISOString().slice(0, 10)
+  if (paid) {
+    await pool.query(
+      `INSERT INTO daily_sales (university, sale_date, total_orders, total_revenue, paid_orders, paid_revenue)
+       VALUES ($1, $2, 1, $3, 1, $3)
+       ON CONFLICT (university, sale_date) DO UPDATE SET
+         total_orders = daily_sales.total_orders + 1,
+         total_revenue = daily_sales.total_revenue + $3,
+         paid_orders = daily_sales.paid_orders + 1,
+         paid_revenue = daily_sales.paid_revenue + $3,
+         updated_at = now()`,
+      [university, saleDate, totalNum]
+    )
+  } else {
+    await pool.query(
+      `INSERT INTO daily_sales (university, sale_date, total_orders, total_revenue, paid_orders, paid_revenue)
+       VALUES ($1, $2, 1, $3, 0, 0)
+       ON CONFLICT (university, sale_date) DO UPDATE SET
+         total_orders = daily_sales.total_orders + 1,
+         total_revenue = daily_sales.total_revenue + $3,
+         updated_at = now()`,
+      [university, saleDate, totalNum]
+    )
+  }
+}
+
+export async function reverseDailySale(order) {
+  const totalNum = parsePriceNum(order.total)
+  const university = order.university || 'default'
+  const saleDate = new Date(order.created_at).toISOString().slice(0, 10)
+  await pool.query(
+    `UPDATE daily_sales SET
+       total_orders = GREATEST(total_orders - 1, 0),
+       total_revenue = GREATEST(total_revenue - $3, 0),
+       paid_orders = GREATEST(paid_orders - 1, 0),
+       paid_revenue = GREATEST(paid_revenue - $3, 0),
+       updated_at = now()
+     WHERE university = $1 AND sale_date = $2`,
+    [university, saleDate, totalNum]
+  )
+}
+
 async function getNotifyEmail(university) {
   if (!university) return config.adminEmail || null
   try {
@@ -95,6 +146,8 @@ orderRouter.post('/', requireUser, async (req, res) => {
   )
 
   const order = result.rows[0]
+
+  await trackDailySale(order, false)
 
   // Send order confirmation email
   const itemsList = items.map(i =>
@@ -251,6 +304,24 @@ orderAdminRouter.get('/', async (req, res) => {
   res.json({ orders: result.rows })
 })
 
+// Daily sales summary (admin, superuser only)
+orderAdminRouter.get('/daily-sales', async (req, res) => {
+  const university = req.query.university || null
+  const days = parseInt(req.query.days) || 30
+  let query = `
+    SELECT university, sale_date, total_orders, total_revenue, paid_orders, paid_revenue
+    FROM daily_sales
+    WHERE sale_date >= CURRENT_DATE - INTERVAL '1 day' * $1`
+  const params = [days]
+  if (university) {
+    query += ' AND university = $2'
+    params.push(university)
+  }
+  query += ' ORDER BY sale_date DESC, university'
+  const result = await pool.query(query, params)
+  res.json({ sales: result.rows })
+})
+
 // Set an order's status: confirmed / canceled / delivered (admin)
 orderAdminRouter.put('/:id/status', async (req, res) => {
   const { status } = req.body ?? {}
@@ -328,11 +399,13 @@ orderAdminRouter.put('/:id/payment', async (req, res) => {
   // Subtract stock when marking as paid (only if not already paid)
   if (payment_status === 'paid' && order.payment_status !== 'paid') {
     await deductStock(order)
+    await trackDailySale(order, true)
   }
 
   // Restore stock if un-marking as paid (revert the deduction)
   if (payment_status !== 'paid' && order.payment_status === 'paid') {
     await restoreStock(order)
+    await reverseDailySale(order)
   }
 
   const result = await pool.query(
