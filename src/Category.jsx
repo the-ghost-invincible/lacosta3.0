@@ -1,4 +1,4 @@
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { Header, CategoryNavigation } from './Header'
 import { useSiteData } from './useSiteData'
 import { useCart } from './CartContext'
@@ -14,12 +14,18 @@ export function CategoryPage() {
   const catalogRef = useRef(null)
   const { categories, catalogProducts, deals, trendingProducts, categoryMenus } = useSiteData()
   const { addToCart, reservedQty } = useCart()
+  const navigate = useNavigate()
   const [justAddedId, setJustAddedId] = useState(null)
 
   const handleAdd = (product) => {
     addToCart(product)
     setJustAddedId(product.id)
     setTimeout(() => setJustAddedId((cur) => (cur === product.id ? null : cur)), 1200)
+  }
+
+  const handleBuyNow = (product) => {
+    addToCart(product)
+    navigate('/cart')
   }
   const [selectedProductId, setSelectedProductId] = useState(null)
   const [selectedBrand, setSelectedBrand] = useState('All')
@@ -417,7 +423,7 @@ export function CategoryPage() {
 
                 <div className="detail-actions">
                   <button type="button" className="primary-btn" disabled={catSoldOut} onClick={() => handleAdd(currentProduct)}>{justAddedId === currentProduct.id ? "Added ✓" : catSoldOut ? "Out of stock" : "Add to cart"}</button>
-                  <button type="button" className="secondary-btn">Buy now</button>
+                  <button type="button" className="secondary-btn" disabled={catSoldOut} onClick={() => handleBuyNow(currentProduct)}>Buy now</button>
                 </div>
                 {!catSoldOut && catRemaining > 0 && (
                   <span className="stock-info">{catRemaining} in stock</span>

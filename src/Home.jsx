@@ -3,12 +3,14 @@ import { useSiteData } from './useSiteData'
 import { useCart } from './CartContext'
 import { ProductModal } from './ProductModal'
 import { useState, useMemo, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { parsePrice } from './utils'
 import './App.css'
 
 export function Home() {
   const { catalogProducts, featuredProducts, deals, trendingProducts, benefits, siteContent } = useSiteData()
   const { addToCart, reservedQty } = useCart()
+  const navigate = useNavigate()
   const [selectedProductId, setSelectedProductId] = useState(catalogProducts[0]?.id ?? null)
   const [justAddedId, setJustAddedId] = useState(null)
   const [modalProduct, setModalProduct] = useState(null)
@@ -32,6 +34,11 @@ export function Home() {
     addToCart(product)
     setJustAddedId(product.id)
     setTimeout(() => setJustAddedId((cur) => (cur === product.id ? null : cur)), 1200)
+  }
+
+  const handleBuyNow = (product) => {
+    addToCart(product)
+    navigate('/cart')
   }
 
   return (
@@ -232,7 +239,7 @@ export function Home() {
 
             <div className="detail-actions">
               <button type="button" className="primary-btn" disabled={curSoldOut} onClick={() => handleAdd(currentProduct)}>{justAddedId === currentProduct.id ? "Added ✓" : curSoldOut ? "Out of stock" : "Add to cart"}</button>
-              <button type="button" className="secondary-btn">Buy now</button>
+              <button type="button" className="secondary-btn" disabled={curSoldOut} onClick={() => handleBuyNow(currentProduct)}>Buy now</button>
             </div>
             {!curSoldOut && curRemaining > 0 && (
               <span className="stock-info">{curRemaining} in stock</span>
