@@ -434,15 +434,22 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
   }
 
   // Full-page product editor routes
+  const [duplicateProduct, setDuplicateProduct] = useState(null)
   const isNewProduct = location.pathname === `${ADMIN_PATH}/products/new`
   const editMatch = location.pathname.match(/\/products\/(\d+)\/edit$/)
   const editProductId = editMatch ? Number(editMatch[1]) : null
   const editingProduct = isNewProduct
-    ? { ...emptyProduct(), category: db?.categories?.find((c) => c.name !== 'All')?.name ?? '', university: selectedUni }
+    ? (duplicateProduct
+        ? { ...duplicateProduct, id: 0, name: `${duplicateProduct.name} (copy)` }
+        : { ...emptyProduct(), category: db?.categories?.find((c) => c.name !== 'All')?.name ?? '', university: selectedUni })
     : editProductId != null
       ? (db?.catalogProducts ?? []).find((p) => Number(p.id) === editProductId) ?? null
       : null
   const onProductEditor = Boolean(editingProduct)
+
+  useEffect(() => {
+    if (!onProductEditor) setDuplicateProduct(null)
+  }, [onProductEditor])
 
   const saveProduct = async (product) => {
     try {
@@ -708,7 +715,7 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
         ) : (
           <>
             {tab === 'products' && (
-              <ProductsTab products={db.catalogProducts} onSave={(v) => save('catalogProducts', v)} />
+              <ProductsTab products={db.catalogProducts} onSave={(v) => save('catalogProducts', v)} onDuplicate={(p) => { setDuplicateProduct(p); navigate(`${ADMIN_PATH}/products/new`) }} />
             )}
             {tab === 'customers' && (
               <CustomersTab university={selectedUni} role={role} />
@@ -1004,7 +1011,7 @@ function ProductForm({ initial, categories, onSave, onCancel }) {
   )
 }
 
-function ProductsTab({ products, onSave }) {
+function ProductsTab({ products, onSave, onDuplicate }) {
   const [query, setQuery] = useState('')
   const navigate = useNavigate()
 
@@ -1050,6 +1057,7 @@ function ProductsTab({ products, onSave }) {
                   <td>{p.quantity ?? 0}</td>
                   <td>★ {p.rating}</td>
                   <td style={{ textAlign: 'right' }}>
+                    <button type="button" className="btn ghost small" onClick={() => onDuplicate(p)}>Duplicate</button>{' '}
                     <button type="button" className="btn ghost small" onClick={() => navigate(`${ADMIN_PATH}/products/${p.id}/edit`)}>Edit</button>{' '}
                     <button type="button" className="btn danger small" onClick={() => removeProduct(p.id)}>Delete</button>
                   </td>
