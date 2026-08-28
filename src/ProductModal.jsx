@@ -126,44 +126,40 @@ export function ProductModal({ product, onClose }) {
         </div>
 
         <div className="product-modal-body">
-          <div className="product-modal-sticky-header">
-            {product.category && <span className="product-category">{product.category}</span>}
-            <h3>{product.name}</h3>
+          {product.category && <span className="product-category">{product.category}</span>}
+          <h3>{product.name}</h3>
 
-            <div className="rating-row">
-              {product.rating != null && <span>★ {product.rating}</span>}
-              {product.seller && <span>{product.seller}</span>}
-            </div>
-
-            <div className="detail-price">
-              <strong>{product.price}</strong>
-              {product.oldPrice && <span>{product.oldPrice}</span>}
-            </div>
-            {product.unitPrice && <div className="unit-price" style={{ marginTop: '-2px' }}>@ {product.unitPrice}</div>}
-
-            <span className={`detail-badge ${soldOut ? 'out-of-stock' : ''}`}>
-              {soldOut ? 'Out of stock' : `In stock (${remaining})`}
-            </span>
-
-            <button type="button" className="primary-btn product-modal-add" disabled={soldOut} onClick={handleAdd}>
-              {justAdded ? 'Added ✓' : soldOut ? 'Out of stock' : 'Add to cart'}
-            </button>
-            {!soldOut && remaining > 0 && (
-              <span className="stock-info">{remaining} in stock</span>
-            )}
+          <div className="rating-row">
+            {product.rating != null && <span>★ {product.rating}</span>}
+            {product.seller && <span>{product.seller}</span>}
           </div>
 
-          <div className="product-modal-scroll-content">
-            {product.description && <p className="detail-description">{product.description}</p>}
-
-            {Array.isArray(product.specs) && product.specs.length > 0 && (
-              <div className="spec-list">
-                {product.specs.map((spec) => (
-                  <span key={spec}>{spec}</span>
-                ))}
-              </div>
-            )}
+          <div className="detail-price">
+            <strong>{product.price}</strong>
+            {product.oldPrice && <span>{product.oldPrice}</span>}
           </div>
+          {product.unitPrice && <div className="unit-price" style={{ marginTop: '-2px' }}>@ {product.unitPrice}</div>}
+
+          <span className={`detail-badge ${soldOut ? 'out-of-stock' : ''}`}>
+            {soldOut ? 'Out of stock' : `In stock (${remaining})`}
+          </span>
+
+          {product.description && <p className="detail-description">{product.description}</p>}
+
+          {Array.isArray(product.specs) && product.specs.length > 0 && (
+            <div className="spec-list">
+              {product.specs.map((spec) => (
+                <span key={spec}>{spec}</span>
+              ))}
+            </div>
+          )}
+
+          <button type="button" className="primary-btn product-modal-add" disabled={soldOut} onClick={handleAdd}>
+            {justAdded ? 'Added ✓' : soldOut ? 'Out of stock' : 'Add to cart'}
+          </button>
+          {!soldOut && remaining > 0 && (
+            <span className="stock-info">{remaining} in stock</span>
+          )}
         </div>
       </div>
     </div>
