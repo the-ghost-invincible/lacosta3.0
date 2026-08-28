@@ -138,6 +138,7 @@ export function ProductModal({ product, onClose }) {
             <strong>{product.price}</strong>
             {product.oldPrice && <span>{product.oldPrice}</span>}
           </div>
+          {product.unitPrice && <div className="unit-price" style={{ marginTop: '-2px' }}>@ {product.unitPrice}</div>}
 
           <span className={`detail-badge ${soldOut ? 'out-of-stock' : ''}`}>
             {soldOut ? 'Out of stock' : `In stock (${remaining})`}

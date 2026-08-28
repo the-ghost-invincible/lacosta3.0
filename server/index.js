@@ -100,6 +100,7 @@ async function readData(university) {
         oldPrice: oldPriceFormatted,
         priceNum,
         oldPriceNum,
+        unitPrice: p.unit_price ?? '',
         seller: p.seller,
         rating: Number(p.rating),
         image: p.image,
@@ -157,27 +158,27 @@ async function writeProduct(product) {
          price = $5, old_price = $6, price_num = $7, old_price_num = $8,
          seller = $9, rating = $10, image = $11,
          description = $12, specs = $13, badge = $14, out_of_stock = $15, quantity = $16,
-         university = $17, images = $18, updated_at = now()
-         WHERE id = $19`,
+         university = $17, images = $18, unit_price = $19, updated_at = now()
+         WHERE id = $20`,
         [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
          priceText, oldPriceText, priceNum, oldPriceNum,
          product.seller ?? null, product.rating ?? 4.5,
          primaryImage, product.description ?? null, JSON.stringify(product.specs ?? []),
          product.badge ?? null, autoOutOfStock, product.quantity ?? 0, university,
-         JSON.stringify(images), product.id]
+         JSON.stringify(images), product.unit_price ?? null, product.id]
       )
     } else {
       const result = await client.query(
         `INSERT INTO products (name, category, brand, subcategory, price, old_price, price_num, old_price_num,
-         seller, rating, image, description, specs, badge, out_of_stock, quantity, university, images)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+         seller, rating, image, description, specs, badge, out_of_stock, quantity, university, images, unit_price)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
          RETURNING id`,
         [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
          priceText, oldPriceText, priceNum, oldPriceNum,
          product.seller ?? null, product.rating ?? 4.5,
          primaryImage, product.description ?? null, JSON.stringify(product.specs ?? []),
          product.badge ?? null, autoOutOfStock, product.quantity ?? 0, university,
-         JSON.stringify(images)]
+         JSON.stringify(images), product.unit_price ?? null]
       )
       product.id = result.rows[0].id
     }

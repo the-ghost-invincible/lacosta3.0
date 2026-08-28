@@ -926,6 +926,7 @@ function emptyProduct() {
     oldPrice: '',
     priceNum: 0,
     oldPriceNum: '',
+    unitPrice: '',
     image: '',
     images: [],
     seller: '',
@@ -1032,6 +1033,18 @@ function ProductForm({ initial, categories, onSave, onCancel }) {
             <span style={{ padding: '0.6rem 0.75rem', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: '8px 0 0 8px', fontSize: '0.85rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>KSh</span>
             <input type="number" min="0" step="0.01" style={{ borderRadius: '0 8px 8px 0' }} value={product.oldPriceNum ?? ''} onChange={(e) => set('oldPriceNum', e.target.value)} placeholder="0" />
           </div>
+        </div>
+        <div className="form-field">
+          <label>Unit price text</label>
+          <input type="text" value={product.unitPrice ?? ''} onChange={(e) => set('unitPrice', e.target.value)} placeholder="e.g. per piece, /kg, per 500ml" />
+          <small className="muted" style={{ display: 'block', marginTop: '4px' }}>
+            Shows below the price as <strong>@ per piece</strong>. Leave empty to hide.
+          </small>
+          {product.unitPrice && product.priceNum > 0 && (
+            <div style={{ marginTop: '6px', padding: '6px 10px', background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              Preview: <strong>KSh {Number(product.priceNum).toLocaleString()}</strong> <span style={{ opacity: 0.7 }}>@ {product.unitPrice}</span>
+            </div>
+          )}
         </div>
         <div className="form-field">
           <label>Quantity in stock</label>

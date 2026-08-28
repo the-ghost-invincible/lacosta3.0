@@ -169,6 +169,8 @@ export async function initDb() {
   // Numeric price columns (double format)
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_num DOUBLE PRECISION")
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS old_price_num DOUBLE PRECISION")
+  // Unit price text (e.g. "per piece", "/kg")
+  await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS unit_price TEXT")
   // Migrate existing text prices to numeric
   await pool.query("UPDATE products SET price_num = CAST(REGEXP_REPLACE(price, '[^0-9.]', '', 'g') AS DOUBLE PRECISION) WHERE price_num IS NULL AND price IS NOT NULL AND price != ''")
   await pool.query("UPDATE products SET old_price_num = CAST(REGEXP_REPLACE(old_price, '[^0-9.]', '', 'g') AS DOUBLE PRECISION) WHERE old_price_num IS NULL AND old_price IS NOT NULL AND old_price != ''")

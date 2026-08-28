@@ -90,6 +90,7 @@ export function SearchResults() {
                     <strong>{product.price}</strong>
                     <span>{product.oldPrice}</span>
                   </div>
+                  {product.unitPrice && <div className="unit-price">@ {product.unitPrice}</div>}
                   <button type="button" onClick={(e) => { e.stopPropagation(); handleAdd(product) }}>
                     {justAddedId === product.id ? 'Added ✓' : 'Add to cart'}
                   </button>

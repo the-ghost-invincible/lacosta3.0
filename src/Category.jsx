@@ -364,6 +364,7 @@ export function CategoryPage() {
                         <strong>{product.price}</strong>
                         <span>{product.oldPrice}</span>
                       </div>
+                      {product.unitPrice && <div className="unit-price">@ {product.unitPrice}</div>}
                       {!soldOut && remaining > 0 && remaining <= 5 && (
                         <span className="stock-low">Only {remaining} left</span>
                       )}
@@ -404,6 +405,7 @@ export function CategoryPage() {
                   <strong>{currentProduct.price}</strong>
                   <span>{currentProduct.oldPrice}</span>
                 </div>
+                {currentProduct.unitPrice && <div className="unit-price" style={{ marginTop: '-4px' }}>@ {currentProduct.unitPrice}</div>}
 
                 <p className="detail-description">{currentProduct.description}</p>
 
@@ -451,6 +453,7 @@ export function CategoryPage() {
                 <div>
                   <h3>{product.name}</h3>
                   <strong>{product.price}</strong>
+                  {product.unitPrice && <div className="unit-price" style={{ fontSize: '0.7rem' }}>@ {product.unitPrice}</div>}
                 </div>
               </article>
             ))}

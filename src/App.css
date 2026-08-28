@@ -1364,6 +1364,13 @@
   font-size: 0.8rem;
 }
 
+.unit-price {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: -10px;
+  margin-bottom: 4px;
+}
+
 .product-card button {
   width: 100%;
   border-radius: 12px;
