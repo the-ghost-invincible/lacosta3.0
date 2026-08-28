@@ -164,6 +164,8 @@ export async function initDb() {
   await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS lipana_till_number TEXT")
   // University column on products
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS university TEXT")
+  // Multiple images per product
+  await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb")
   // Sync out_of_stock flag with quantity
   await pool.query("UPDATE products SET out_of_stock = true WHERE quantity <= 0 AND out_of_stock = false")
   await pool.query("UPDATE products SET out_of_stock = false WHERE quantity > 0 AND out_of_stock = true")

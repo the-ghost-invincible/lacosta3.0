@@ -860,8 +860,9 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
   )
 }
 
-function ImageField({ value, onChange }) {
+function ImageField({ value, onChange, placeholder }) {
   const [busy, setBusy] = useState(false)
+  const [inputVal, setInputVal] = useState(value ?? '')
 
   const upload = async (file) => {
     setBusy(true)
@@ -873,23 +874,41 @@ function ImageField({ value, onChange }) {
     setBusy(false)
   }
 
+  const submitUrl = () => {
+    const trimmed = inputVal.trim()
+    if (trimmed) {
+      onChange(trimmed)
+      setInputVal('')
+    }
+  }
+
   return (
     <div className="image-field">
       {value && <img src={value} alt="" />}
-      <input type="text" value={value ?? ''} onChange={(e) => onChange(e.target.value)} placeholder="Image URL or /uploads/…" />
-      <label className="btn ghost small" style={{ margin: 0 }}>
-        {busy ? 'Uploading…' : 'Upload'}
-        <input
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) upload(file)
-            e.target.value = ''
-          }}
-        />
-      </label>
+      <input
+        type="text"
+        value={inputVal}
+        onChange={(e) => setInputVal(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitUrl() } }}
+        placeholder={placeholder ?? 'Image URL or /uploads/…'}
+      />
+      {inputVal.trim() ? (
+        <button type="button" className="btn ghost small" style={{ margin: 0 }} onClick={submitUrl}>Add</button>
+      ) : (
+        <label className="btn ghost small" style={{ margin: 0 }}>
+          {busy ? 'Uploading…' : 'Upload'}
+          <input
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) upload(file)
+              e.target.value = ''
+            }}
+          />
+        </label>
+      )}
     </div>
   )
 }
@@ -902,6 +921,7 @@ function emptyProduct() {
     price: '',
     oldPrice: '',
     image: '',
+    images: [],
     seller: '',
     rating: 4.5,
     brand: '',
@@ -914,11 +934,42 @@ function emptyProduct() {
 }
 
 function ProductForm({ initial, categories, onSave, onCancel }) {
-  const [product, setProduct] = useState(initial)
+  const [product, setProduct] = useState(() => {
+    const imgs = initial.images?.length ? initial.images : (initial.image ? [initial.image] : [])
+    return { ...initial, images: imgs }
+  })
   const set = (key, value) => setProduct((prev) => ({ ...prev, [key]: value }))
 
+  const addImage = (url) => {
+    setProduct((prev) => {
+      const imgs = [...prev.images, url]
+      return { ...prev, images: imgs, image: imgs[0] ?? '' }
+    })
+  }
+
+  const removeImage = (idx) => {
+    setProduct((prev) => {
+      const imgs = prev.images.filter((_, i) => i !== idx)
+      return { ...prev, images: imgs, image: imgs[0] ?? '' }
+    })
+  }
+
+  const moveImage = (idx, dir) => {
+    setProduct((prev) => {
+      const imgs = [...prev.images]
+      const target = idx + dir
+      if (target < 0 || target >= imgs.length) return prev
+      ;[imgs[idx], imgs[target]] = [imgs[target], imgs[idx]]
+      return { ...prev, images: imgs, image: imgs[0] ?? '' }
+    })
+  }
+
   const submit = () => {
-    const next = { ...product, specs: (product.specs || []).join(',').split(',').map((s) => s.trim()).filter(Boolean) }
+    const next = {
+      ...product,
+      specs: (product.specs || []).join(',').split(',').map((s) => s.trim()).filter(Boolean),
+      image: product.images[0] ?? product.image ?? '',
+    }
     onSave(next)
   }
 
@@ -971,8 +1022,20 @@ function ProductForm({ initial, categories, onSave, onCancel }) {
           <input type="number" min="0" max="5" step="0.1" value={product.rating ?? 4.5} onChange={(e) => set('rating', parseFloat(e.target.value) || 0)} />
         </div>
         <div className="form-field full">
-          <label>Image</label>
-          <ImageField value={product.image} onChange={(v) => set('image', v)} />
+          <label>Images (first image is the main product image)</label>
+          <div className="images-list">
+            {product.images.map((img, idx) => (
+              <div key={idx} className="images-list-item">
+                <img src={img} alt="" />
+                <div className="images-list-actions">
+                  {idx > 0 && <button type="button" className="btn ghost small" onClick={() => moveImage(idx, -1)} title="Move left">←</button>}
+                  {idx < product.images.length - 1 && <button type="button" className="btn ghost small" onClick={() => moveImage(idx, 1)} title="Move right">→</button>}
+                  <button type="button" className="btn danger small" onClick={() => removeImage(idx)} title="Remove">✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <ImageField value="" onChange={(v) => { if (v) addImage(v) }} placeholder="Add image URL or upload…" />
         </div>
         <div className="form-field full">
           <label>Description</label>

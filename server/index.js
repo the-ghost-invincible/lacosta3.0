@@ -84,23 +84,27 @@ async function readData(university) {
       'SELECT * FROM products WHERE active = true AND university = $1 ORDER BY id',
       [uniFilter]
     )
-    dbData.catalogProducts = productsResult.rows.map(p => ({
-      id: p.id,
-      name: p.name,
-      category: p.category,
-      brand: p.brand,
-      subcategory: p.subcategory,
-      price: p.price,
-      oldPrice: p.old_price,
-      seller: p.seller,
-      rating: Number(p.rating),
-      image: p.image,
-      description: p.description,
-      specs: p.specs,
-      badge: p.badge,
-      outOfStock: p.out_of_stock || p.quantity <= 0,
-      quantity: p.quantity,
-    }))
+    dbData.catalogProducts = productsResult.rows.map(p => {
+      const images = p.images?.length ? p.images : (p.image ? [p.image] : [])
+      return {
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        brand: p.brand,
+        subcategory: p.subcategory,
+        price: p.price,
+        oldPrice: p.old_price,
+        seller: p.seller,
+        rating: Number(p.rating),
+        image: p.image,
+        images,
+        description: p.description,
+        specs: p.specs,
+        badge: p.badge,
+        outOfStock: p.out_of_stock || p.quantity <= 0,
+        quantity: p.quantity,
+      }
+    })
 
     // Merge with fallback data from JSON file
     const fallback = JSON.parse(fs.readFileSync(dataFile, 'utf8'))
@@ -135,27 +139,31 @@ async function writeProduct(product) {
     await client.query('BEGIN')
     const autoOutOfStock = (product.quantity ?? 0) <= 0
     const university = product.university || 'default'
+    const images = product.images?.length ? product.images : (product.image ? [product.image] : [])
+    const primaryImage = images[0] ?? product.image ?? null
     if (product.id) {
       await client.query(
         `UPDATE products SET name = $1, category = $2, brand = $3, subcategory = $4,
          price = $5, old_price = $6, seller = $7, rating = $8, image = $9,
          description = $10, specs = $11, badge = $12, out_of_stock = $13, quantity = $14,
-         university = $15, updated_at = now()
-         WHERE id = $16`,
+         university = $15, images = $16, updated_at = now()
+         WHERE id = $17`,
         [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
          product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
-         product.image ?? null, product.description ?? null, JSON.stringify(product.specs ?? []),
-         product.badge ?? null, autoOutOfStock, product.quantity ?? 0, university, product.id]
+         primaryImage, product.description ?? null, JSON.stringify(product.specs ?? []),
+         product.badge ?? null, autoOutOfStock, product.quantity ?? 0, university,
+         JSON.stringify(images), product.id]
       )
     } else {
       const result = await client.query(
-        `INSERT INTO products (name, category, brand, subcategory, price, old_price, seller, rating, image, description, specs, badge, out_of_stock, quantity, university)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        `INSERT INTO products (name, category, brand, subcategory, price, old_price, seller, rating, image, description, specs, badge, out_of_stock, quantity, university, images)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          RETURNING id`,
         [product.name, product.category, product.brand ?? null, product.subcategory ?? null,
          product.price, product.oldPrice ?? null, product.seller ?? null, product.rating ?? 4.5,
-         product.image ?? null, product.description ?? null, JSON.stringify(product.specs ?? []),
-         product.badge ?? null, autoOutOfStock, product.quantity ?? 0, university]
+         primaryImage, product.description ?? null, JSON.stringify(product.specs ?? []),
+         product.badge ?? null, autoOutOfStock, product.quantity ?? 0, university,
+         JSON.stringify(images)]
       )
       product.id = result.rows[0].id
     }
