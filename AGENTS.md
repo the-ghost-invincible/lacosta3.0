@@ -16,6 +16,7 @@ Lacosta 3.0 is a **multi-tenant e-commerce marketplace** for Kenyan university c
 | Auth | scrypt password hashing, HTTP-only session cookies |
 | CDN/DNS | Cloudflare (proxied, free plan) |
 | Server | Hostinger VPS (Ubuntu), Nginx, PM2, Certbot (SSL) |
+| Tunnel | `cloudflared` quick tunnel (backup access when ISP routing fails) |
 | Testing | Vitest |
 | Linting | Oxlint |
 
@@ -147,6 +148,23 @@ Located at `/etc/nginx/sites-available/lacosta`. Key features:
 - Proxy to Node.js on port 4000
 - Static asset caching (`/assets/` 1 year, `/uploads/` 30 days)
 
+### Cloudflare Tunnel (backup)
+If ISP routing fails (common with some Kenyan ISPs), `cloudflared` provides direct tunnel access:
+```bash
+# Install (one-time)
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
+chmod +x /usr/local/bin/cloudflared
+
+# Start quick tunnel (temporary URL)
+cloudflared tunnel --url http://localhost:4000
+
+# Start as background service (persistent)
+cloudflared service install
+systemctl enable cloudflared
+systemctl start cloudflared
+```
+Quick tunnel gives a temporary `*.trycloudflare.com` URL. For production, use a named tunnel with a Cloudflare account.
+
 ## Commands
 
 ```bash
@@ -180,6 +198,13 @@ pm2 stop lacosta-api    # Stop app
 
 ## Universities (in database)
 
-- `seku` — SEKU University
+- `seku` — SEKU University (notify: lacostamarkets@gmail.com)
 - `mama-ngina-university` — Mama Ngina University (notify: lacostamarketsmnuc@gmail.com)
 - `ku` — KU (notify: lacostamarkets@gmail.com)
+
+## Known Issues
+
+- **Kenyan ISP routing**: Some ISPs cannot route directly to Hostinger VPS IP `72.62.132.86`. Cloudflare proxy is configured but may require DNS flush on client devices. Cloudflare tunnel (`cloudflared`) works as fallback.
+- **Admin panel at 2,459 lines**: Single file (`Admin.jsx`) with 16 components — should be split into separate files.
+- **No 404 route**: Missing catch-all route in `App.jsx`.
+- **No pagination**: Products, orders, customers all load as flat lists.
