@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Lacosta 3.0 is a **multi-tenant e-commerce marketplace** for Kenyan university campuses. Each university gets its own isolated storefront (products, orders, site content, admin panel, payment till). Production: `lacostamarkets.site`.
+Lacosta 3.0 is a **multi-tenant e-commerce marketplace** for Kenyan university campuses. Each university gets its own isolated storefront (products, orders, site content, admin panel, payment till). Production: `lacostamarket.shop`.
 
 ## Tech Stack
 

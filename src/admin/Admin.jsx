@@ -557,13 +557,13 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
             </button>
           )}
           <a
-            href="https://lacostamarkets.site"
+            href="https://lacostamarket.shop"
             target="_blank"
             rel="noopener noreferrer"
             className="btn ghost small ngrok-badge"
             title="Open your store"
           >
-            <span className="site-logo"><img src="/logo.png" alt="Lacosta" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '6px' }} /></span> lacostamarkets.site
+            <span className="site-logo"><img src="/logo.png" alt="Lacosta" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '6px' }} /></span> lacostamarket.shop
           </a>
           <button
             type="button"
@@ -671,7 +671,7 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
                 type="email"
                 value={newUniEmail}
                 onChange={(e) => setNewUniEmail(e.target.value)}
-                placeholder="e.g. lacostamarketsmamangina@gmail.com"
+                placeholder="e.g. mamangina@lacostamarket.shop"
               />
             </label>
             <div className="form-actions">
@@ -725,7 +725,7 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
               <OrdersTab university={selectedUni} role={role} />
             )}
             {tab === 'payments' && (
-              <PaymentsTab university={selectedUni} role={role} baseUrl={ngrokUrl || 'https://lacostamarkets.site'} />
+              <PaymentsTab university={selectedUni} role={role} baseUrl={ngrokUrl || 'https://lacostamarket.shop'} />
             )}
             {tab === 'featured' && (
               <FeaturedTab products={db.featuredProducts} categories={db.categories} onSave={(v) => save('featuredProducts', v)} />
@@ -780,7 +780,7 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
                 type="email"
                 value={editEmailValue}
                 onChange={(e) => setEditEmailValue(e.target.value)}
-                placeholder="e.g. lacostamarketsmamangina@gmail.com"
+                placeholder="e.g. mamangina@lacostamarket.shop"
                 autoFocus
               />
             </label>
@@ -825,7 +825,7 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
                 type="email"
                 value={editNotifyEmailValue}
                 onChange={(e) => setEditNotifyEmailValue(e.target.value)}
-                placeholder="e.g. lacostamarketsmnuc@gmail.com"
+                placeholder="e.g. mnuc@lacostamarket.shop"
                 autoFocus
               />
             </label>
