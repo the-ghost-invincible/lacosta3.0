@@ -210,6 +210,7 @@ const generalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later' },
+  keyGenerator: (req) => (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim().replace(/^::ffff:/, ''),
 })
 app.use(generalLimiter)
 
@@ -217,6 +218,7 @@ app.use(generalLimiter)
 const authLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
+  keyGenerator: (req) => (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim().replace(/^::ffff:/, ''),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many auth attempts, please try again later' },
