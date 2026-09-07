@@ -27,6 +27,7 @@ src/           → React SPA (Vite)
 server/        → Express API (port 4000)
 public/        → Static assets (images, uploads)
 deploy/        → Deployment scripts (Nginx, PM2, Certbot)
+scripts/       → Seed script (seed.js) and DB setup (setup-db.sql)
 dist/          → Vite build output (production)
 ```
 
@@ -94,27 +95,27 @@ Email sender address: per-university `email` column in `universities` table, fal
 
 ## Database Schema
 
-8 tables: `users`, `sessions`, `carts`, `orders`, `products`, `universities`, `site_data`, `tokens`
+9 tables: `users`, `sessions`, `carts`, `orders`, `products`, `universities`, `site_data`, `tokens`, `daily_sales`
 
 Migrations run automatically via `ALTER TABLE ADD COLUMN IF NOT EXISTS` in `db.js`.
 
 ## Admin Panel
 
-Located at secret URL (`/admin-749b5eb2`). Two roles:
+Located at secret URL (`/admin-7f3k9`). Two roles:
 - **Superuser** — full access to all universities, can configure payment keys
 - **Sub-user** (university admin) — scoped to their university, can see till number but NOT API keys
 
 ## Environment Variables
 
 ```
-DATABASE_URL=postgres://lacosta:PASSWORD@localhost:5432/lacosta
+DATABASE_URL=postgres://lacosta:CHANGE_ME@localhost:5432/lacosta
 PORT=4000
 BASE_URL=https://lacostamarket.shop
-ADMIN_PASSWORD=CHANGE_ME
-ADMIN_PATH=/admin-749b5eb2
-ADMIN_EMAIL=lacostamarkets@gmail.com
+ADMIN_PASSWORD=CHANGE_ME_TO_A_STRONG_PASSWORD
+ADMIN_PATH=/admin-7f3k9
+ADMIN_EMAIL=your@email.com
 RESEND_API_KEY=re_xxxxx
-EMAIL_FROM=Lacosta <onboarding@resend.dev>
+EMAIL_FROM=Lacosta <noreply@yourdomain.com>
 SENTRY_DSN=
 ```
 
@@ -208,3 +209,7 @@ pm2 stop lacosta-api    # Stop app
 - **Admin panel at 2,459 lines**: Single file (`Admin.jsx`) with 16 components — should be split into separate files.
 - **No 404 route**: Missing catch-all route in `App.jsx`.
 - **No pagination**: Products, orders, customers all load as flat lists.
+- **Hardcoded default passwords**: `config.js` defaults `adminPassword` to `'lacosta-admin'` and `superUserPassword` to `'qazwsxedc'` — must be overridden via env vars in production.
+- **Code duplication**: `hashPassword`/`verifyPassword` duplicated in `index.js` and `auth.js`; `requireUser` middleware triplicated across `cart.js`, `orders.js`, `payment-routes.js`; `getNotifyEmail` duplicated in `orders.js` and `payment-routes.js`; `categorySlug()` hardcoded in `Header.jsx`, `Category.jsx`, `Admin.jsx`.
+- **In-memory sessions**: Admin sessions (`Set`) are lost on server restart and have no expiration.
+- **Webhook idempotency**: Stock deduction in the payment webhook has no guard against duplicate deliveries — retries could deduct stock twice.
