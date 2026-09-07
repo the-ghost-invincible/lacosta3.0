@@ -1795,6 +1795,7 @@ function PaymentsTab({ university, role, baseUrl }) {
   const [tgBusy, setTgBusy] = useState(false)
   const [tgMsg, setTgMsg] = useState(null)
   const [showTgBotToken, setShowTgBotToken] = useState(false)
+  const [tgPassword, setTgPassword] = useState('')
 
   useEffect(() => {
     if (!university) return
@@ -1826,9 +1827,13 @@ function PaymentsTab({ university, role, baseUrl }) {
   }
 
   const saveTelegramConfig = async () => {
+    if (!tgPassword.trim()) {
+      tgFlash('Super user password required')
+      return
+    }
     setTgBusy(true)
     try {
-      const body = {}
+      const body = { password: tgPassword.trim() }
       if (tgBotToken.trim()) body.botToken = tgBotToken.trim()
       if (tgChatId.trim()) body.chatId = tgChatId.trim()
       const res = await api(`/api/admin/universities/${university}/telegram`, {
@@ -1841,8 +1846,10 @@ function PaymentsTab({ university, role, baseUrl }) {
         setTgConfig(updated)
         setTgBotToken('')
         setTgChatId('')
+        setTgPassword('')
       } else {
-        tgFlash('Failed to save')
+        const data = await res.json().catch(() => ({}))
+        tgFlash(data.error ?? 'Failed to save')
       }
     } catch {
       tgFlash('Failed to save')
@@ -2092,6 +2099,16 @@ function PaymentsTab({ university, role, baseUrl }) {
             <small style={{ color: 'var(--text-secondary)' }}>
               {tgConfig?.chatIdPreview && !tgChatId ? `Current: ${tgConfig.chatIdPreview}` : 'Send /start to @userinfobot to find your chat ID'}
             </small>
+          </label>
+
+          <label className="form-field">
+            <span>Super User Password</span>
+            <input
+              type="password"
+              value={tgPassword}
+              onChange={(e) => setTgPassword(e.target.value)}
+              placeholder="Required to save changes"
+            />
           </label>
 
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
