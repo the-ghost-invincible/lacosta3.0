@@ -25,8 +25,12 @@ export function CartProvider({ children }) {
     if (loading) return
     let cancelled = false
     const wasSignedIn = Boolean(prevUserRef.current)
+    const prevUserId = prevUserRef.current?.id
     prevUserRef.current = user
     if (user) {
+      if (wasSignedIn && prevUserId !== user.id) {
+        localStorage.removeItem(STORAGE_KEY)
+      }
       fetch('/api/cart')
         .then((res) => res.json())
         .then((data) => {
