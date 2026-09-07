@@ -162,6 +162,9 @@ export async function initDb() {
   await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS lipana_webhook_secret TEXT")
   await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS lipana_environment TEXT DEFAULT 'sandbox'")
   await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS lipana_till_number TEXT")
+  // Telegram notification credentials per university
+  await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS telegram_bot_token TEXT")
+  await pool.query("ALTER TABLE universities ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT")
   // University column on products
   await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS university TEXT")
   // Multiple images per product

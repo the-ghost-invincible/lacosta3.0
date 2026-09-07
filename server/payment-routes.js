@@ -12,6 +12,7 @@ import {
 import { deductStock } from './orders.js'
 import { sendEmail } from './email.js'
 import { requireUser, getNotifyEmail } from './helpers.js'
+import { sendTelegram } from './telegram.js'
 
 const router = Router()
 
@@ -214,6 +215,17 @@ router.post('/webhook/:universitySlug', async (req, res) => {
           `,
         }).catch(() => {})
       }
+
+      // Telegram notification for payment
+      const tgItems = (updatedOrder.items ?? []).map(i => `• ${i.name} × ${i.qty ?? 1}`).join('\n')
+      sendTelegram(
+        `<b>💳 Payment Received — Order #${updatedOrder.id}</b>\n\n` +
+        `<b>Customer:</b> ${updatedOrder.name}\n` +
+        `<b>Amount:</b> KSh ${Number(callback.amount ?? 0).toLocaleString()}\n` +
+        `<b>M-Pesa receipt:</b> ${callback.receipt ?? 'N/A'}\n` +
+        `<b>Items:</b>\n${tgItems}`,
+        updatedOrder.university
+      )
     }
   } catch (err) {
     console.error('[webhook] Error processing webhook:', err)

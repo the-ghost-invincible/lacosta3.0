@@ -627,6 +627,58 @@ app.put('/api/admin/universities/:slug/notify-email', requireAnyAdmin, async (re
   res.json({ ok: true })
 })
 
+// ---------- Admin: Telegram config per university ----------
+import { testTelegram } from './telegram.js'
+
+app.get('/api/admin/universities/:slug/telegram', requireAnyAdmin, async (req, res) => {
+  const { slug } = req.params
+  if (req.adminRole === 'subuser' && slug !== req.adminUniversity) {
+    return res.status(403).json({ error: 'Access denied' })
+  }
+  try {
+    const result = await pool.query(
+      'SELECT telegram_bot_token, telegram_chat_id FROM universities WHERE slug = $1',
+      [slug]
+    )
+    const row = result.rows[0]
+    if (!row) return res.status(404).json({ error: 'University not found' })
+    res.json({
+      configured: Boolean(row.telegram_bot_token && row.telegram_chat_id),
+      botTokenPreview: row.telegram_bot_token ? '****' + row.telegram_bot_token.slice(-8) : null,
+      chatIdPreview: row.telegram_chat_id || null,
+    })
+  } catch {
+    res.status(500).json({ error: 'Failed to load Telegram config' })
+  }
+})
+
+app.put('/api/admin/universities/:slug/telegram', requireAnyAdmin, async (req, res) => {
+  const { slug } = req.params
+  if (req.adminRole === 'subuser' && slug !== req.adminUniversity) {
+    return res.status(403).json({ error: 'Access denied' })
+  }
+  const { botToken, chatId } = req.body ?? {}
+  try {
+    await pool.query(
+      'UPDATE universities SET telegram_bot_token = $1, telegram_chat_id = $2 WHERE slug = $3',
+      [botToken || null, chatId || null, slug]
+    )
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('Failed to update Telegram config:', err.message)
+    res.status(500).json({ error: 'Failed to save Telegram config' })
+  }
+})
+
+app.post('/api/admin/universities/:slug/telegram/test', requireAnyAdmin, async (req, res) => {
+  const { slug } = req.params
+  if (req.adminRole === 'subuser' && slug !== req.adminUniversity) {
+    return res.status(403).json({ error: 'Access denied' })
+  }
+  const result = await testTelegram(slug)
+  res.json(result)
+})
+
 // ---------- Admin: ngrok tunnel ----------
 app.get('/api/admin/ngrok', requireAuth, async (_req, res) => {
   try {

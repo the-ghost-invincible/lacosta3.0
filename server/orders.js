@@ -3,6 +3,7 @@ import { pool } from './db.js'
 import { sendEmail } from './email.js'
 import { config } from './config.js'
 import { requireUser, getNotifyEmail } from './helpers.js'
+import { sendTelegram } from './telegram.js'
 
 const STATUSES = ['pending', 'confirmed', 'canceled', 'delivered']
 
@@ -197,6 +198,18 @@ orderRouter.post('/', requireUser, async (req, res) => {
       `,
     }).catch(() => {})
   }
+
+  // Send Telegram notification to admin
+  const tgItems = items.map(i => `• ${i.name} × ${i.qty ?? 1}`).join('\n')
+  sendTelegram(
+    `<b>🛒 New Order #${order.id}</b>\n\n` +
+    `<b>Customer:</b> ${name} (${req.user.email})\n` +
+    `<b>Phone:</b> ${phone}\n` +
+    `<b>Items:</b>\n${tgItems}\n\n` +
+    `<b>Total:</b> ${order.total}\n` +
+    `<b>University:</b> ${req.user.university || 'default'}`,
+    req.user.university
+  )
 
   res.json({ ok: true, order })
 })

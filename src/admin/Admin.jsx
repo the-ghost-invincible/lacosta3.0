@@ -1412,6 +1412,14 @@ function OrdersTab({ university, role }) {
   const [viewOrder, setViewOrder] = useState(null)
   const [deleteOrderPrompt, setDeleteOrderPrompt] = useState(null)
 
+  const whatsappUrl = (phone, order) => {
+    const num = String(phone ?? '').replace(/[^0-9]/g, '')
+    if (!num) return null
+    const items = (order.items ?? []).map(i => `${i.name} x${i.qty ?? 1}`).join(', ')
+    const msg = `Hi ${order.name}, your order #${order.id} (${order.total}) has been received. Items: ${items}. We'll contact you shortly. — Lacosta`
+    return `https://wa.me/${num.startsWith('254') ? num : '254' + num.slice(-9)}?text=${encodeURIComponent(msg)}`
+  }
+
   const load = () => {
     api(`/api/admin/orders?university=${encodeURIComponent(university ?? '')}`)
       .then((res) => res.json())
@@ -1594,6 +1602,18 @@ function OrdersTab({ university, role }) {
                     >
                       View
                     </button>{' '}
+                    {whatsappUrl(order.phone, order) && (
+                      <a
+                        href={whatsappUrl(order.phone, order)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn small"
+                        style={{ background: '#25D366', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', textDecoration: 'none', fontSize: '12px', lineHeight: '1.4' }}
+                        title="Send WhatsApp message"
+                      >
+                        WA
+                      </a>
+                    )}{' '}
                     {(order.payment_status ?? 'pending') !== 'paid' ? (
                       <button
                         type="button"
@@ -1684,6 +1704,18 @@ function OrdersTab({ university, role }) {
               <p><strong>{viewOrder.name}</strong></p>
               <p className="muted">{viewOrder.phone}</p>
               <p className="muted">{viewOrder.email}</p>
+              {whatsappUrl(viewOrder.phone, viewOrder) && (
+                <a
+                  href={whatsappUrl(viewOrder.phone, viewOrder)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn whatsapp-btn small"
+                  style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#25D366', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '13px' }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                  WhatsApp
+                </a>
+              )}
             </div>
 
             <div className="order-detail-items">
@@ -1757,6 +1789,12 @@ function PaymentsTab({ university, role, baseUrl }) {
   const [showWebhookSecret, setShowWebhookSecret] = useState(false)
   const [superuserPrompt, setSuperuserPrompt] = useState(false)
   const [pendingSave, setPendingSave] = useState(false)
+  const [tgBotToken, setTgBotToken] = useState('')
+  const [tgChatId, setTgChatId] = useState('')
+  const [tgConfig, setTgConfig] = useState(null)
+  const [tgBusy, setTgBusy] = useState(false)
+  const [tgMsg, setTgMsg] = useState(null)
+  const [showTgBotToken, setShowTgBotToken] = useState(false)
 
   useEffect(() => {
     if (!university) return
@@ -1770,11 +1808,58 @@ function PaymentsTab({ university, role, baseUrl }) {
         setWebhookSecret('')
       })
       .catch(() => setConfig({ configured: false }))
+
+    api(`/api/admin/universities/${university}/telegram`)
+      .then((res) => res.json())
+      .then((data) => { setTgConfig(data); setTgBotToken(''); setTgChatId('') })
+      .catch(() => setTgConfig({ configured: false }))
   }, [university])
 
   const flash = (text) => {
     setMsg(text)
     setTimeout(() => setMsg(null), 2500)
+  }
+
+  const tgFlash = (text) => {
+    setTgMsg(text)
+    setTimeout(() => setTgMsg(null), 2500)
+  }
+
+  const saveTelegramConfig = async () => {
+    setTgBusy(true)
+    try {
+      const body = {}
+      if (tgBotToken.trim()) body.botToken = tgBotToken.trim()
+      if (tgChatId.trim()) body.chatId = tgChatId.trim()
+      const res = await api(`/api/admin/universities/${university}/telegram`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        tgFlash('Telegram config saved')
+        const updated = await api(`/api/admin/universities/${university}/telegram`).then(r => r.json())
+        setTgConfig(updated)
+        setTgBotToken('')
+        setTgChatId('')
+      } else {
+        tgFlash('Failed to save')
+      }
+    } catch {
+      tgFlash('Failed to save')
+    }
+    setTgBusy(false)
+  }
+
+  const testTelegramMsg = async () => {
+    setTgBusy(true)
+    try {
+      const res = await api(`/api/admin/universities/${university}/telegram/test`, { method: 'POST' })
+      const data = await res.json()
+      tgFlash(data.ok ? 'Test message sent!' : `Failed: ${data.error}`)
+    } catch {
+      tgFlash('Failed to send test')
+    }
+    setTgBusy(false)
   }
 
   const saveConfig = async () => {
@@ -1841,6 +1926,26 @@ function PaymentsTab({ university, role, baseUrl }) {
           )}
           <p style={{ marginTop: '1rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
             Contact the super admin to configure payment settings.
+          </p>
+        </div>
+
+        <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '1.5rem 0' }} />
+
+        <h3>Telegram Notifications</h3>
+        <div style={{ marginTop: '0.5rem' }}>
+          <p>
+            <strong>Telegram:</strong>{' '}
+            {tgConfig?.configured ? (
+              <span style={{ color: '#16a34a' }}>Connected</span>
+            ) : (
+              <span style={{ color: '#dc2626' }}>Not configured</span>
+            )}
+          </p>
+          {tgConfig?.configured && tgConfig?.chatIdPreview && (
+            <p><strong>Chat ID:</strong> {tgConfig.chatIdPreview}</p>
+          )}
+          <p style={{ marginTop: '1rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            Contact the super admin to configure Telegram notifications.
           </p>
         </div>
       </div>
@@ -1942,6 +2047,78 @@ function PaymentsTab({ university, role, baseUrl }) {
               Configured ({config.environment})
             </span>
           )}
+        </div>
+      </div>
+
+      {/* Telegram Notifications */}
+      <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+        <div className="admin-panel-head" style={{ marginBottom: '1rem' }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Telegram Notifications</h3>
+            <p className="panel-hint" style={{ margin: '0.25rem 0 0' }}>Get instant order alerts via Telegram. Uses a separate bot token per university.</p>
+          </div>
+        </div>
+
+        {tgMsg && <p style={{ padding: '0.5rem 1rem', background: '#f0fdf4', borderRadius: '8px', marginBottom: '1rem', color: '#166534' }}>{tgMsg}</p>}
+
+        <div style={{ display: 'grid', gap: '1.25rem', maxWidth: '500px' }}>
+          <label className="form-field">
+            <span>Bot Token</span>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type={showTgBotToken ? 'text' : 'password'}
+                value={tgBotToken}
+                onChange={(e) => setTgBotToken(e.target.value)}
+                placeholder={tgConfig?.botTokenPreview ? `Existing token ends with ${tgConfig.botTokenPreview}` : 'Paste from @BotFather'}
+                style={{ flex: 1 }}
+              />
+              <button type="button" className="btn ghost small" onClick={() => setShowTgBotToken(!showTgBotToken)}>
+                {showTgBotToken ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            {tgConfig?.botTokenPreview && !tgBotToken && (
+              <small style={{ color: 'var(--text-secondary)' }}>Current: {tgConfig.botTokenPreview}</small>
+            )}
+          </label>
+
+          <label className="form-field">
+            <span>Chat ID</span>
+            <input
+              type="text"
+              value={tgChatId}
+              onChange={(e) => setTgChatId(e.target.value)}
+              placeholder={tgConfig?.chatIdPreview ? `Current: ${tgConfig.chatIdPreview}` : 'Your Telegram chat ID'}
+            />
+            <small style={{ color: 'var(--text-secondary)' }}>
+              {tgConfig?.chatIdPreview && !tgChatId ? `Current: ${tgConfig.chatIdPreview}` : 'Send /start to @userinfobot to find your chat ID'}
+            </small>
+          </label>
+
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+            <button type="button" className="btn" onClick={saveTelegramConfig} disabled={tgBusy}>
+              {tgBusy ? 'Saving...' : 'Save Telegram config'}
+            </button>
+            {tgConfig?.configured && (
+              <button type="button" className="btn ghost" onClick={testTelegramMsg} disabled={tgBusy}>
+                Send test message
+              </button>
+            )}
+            {tgConfig?.configured && (
+              <span style={{ alignSelf: 'center', color: '#16a34a', fontSize: '0.9rem' }}>
+                Connected
+              </span>
+            )}
+          </div>
+
+          <div style={{ background: 'var(--bg-secondary)', borderRadius: '8px', padding: '0.75rem 1rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            <strong>How to set up:</strong>
+            <ol style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem' }}>
+              <li>Search <strong>@BotFather</strong> on Telegram, send <code>/newbot</code></li>
+              <li>Copy the bot token and paste above</li>
+              <li>Message your new bot, then open <code>https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code> to find your chat ID</li>
+              <li>Paste the chat ID and save</li>
+            </ol>
+          </div>
         </div>
       </div>
 
