@@ -147,23 +147,26 @@ orderRouter.post('/', requireUser, async (req, res) => {
     subject: `Order #${order.id} received — Lacosta`,
     university: req.user.university,
     html: `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-        <h2 style="color:#65a30d">Order confirmed!</h2>
-        <p>Hi ${name},</p>
-        <p>We've received your order <strong>#${order.id}</strong>.</p>
-        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+      <div style="padding:40px 32px;">
+        <div style="text-align:center;margin-bottom:24px;">
+          <img src="${config.baseUrl}/logo.png" alt="Lacosta" width="48" height="48" style="border-radius:12px;">
+        </div>
+        <h2 style="font-size:22px;font-weight:700;color:#1a1a1a;margin:0 0 8px;text-align:center;">Order confirmed!</h2>
+        <p style="font-size:15px;color:#52525b;margin:0 0 24px;text-align:center;">Hi ${name}, we've received your order <strong>#${order.id}</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
           <thead>
-            <tr style="background:#f5f5f5">
-              <th style="padding:8px;text-align:left">Item</th>
-              <th style="padding:8px;text-align:center">Qty</th>
-              <th style="padding:8px;text-align:right">Price</th>
+            <tr style="background:#f5f5f5;">
+              <th style="padding:10px 12px;text-align:left;font-size:13px;color:#71717a;">Item</th>
+              <th style="padding:10px 12px;text-align:center;font-size:13px;color:#71717a;">Qty</th>
+              <th style="padding:10px 12px;text-align:right;font-size:13px;color:#71717a;">Price</th>
             </tr>
           </thead>
           <tbody>${itemsList}</tbody>
         </table>
-        <p style="font-size:18px"><strong>Total: ${order.total}</strong></p>
-        <p>We'll contact you at <strong>${phone}</strong> to confirm delivery details.</p>
-        <p style="color:#666;font-size:14px">If you have any questions, reply to this email or call 0112974286.</p>
+        <p style="font-size:18px;text-align:center;margin:24px 0;"><strong>Total: ${order.total}</strong></p>
+        <p style="font-size:14px;color:#52525b;text-align:center;">We'll contact you at <strong>${phone}</strong> to confirm delivery.</p>
+        <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0;">
+        <p style="font-size:13px;color:#a1a1aa;text-align:center;margin:0;">Questions? Reply to this email or call 0112974286.</p>
       </div>
     `,
   }).catch(() => {})
@@ -260,6 +263,16 @@ orderRouter.put('/:id/status', requireUser, async (req, res) => {
     }).catch(() => {})
   }
 
+  // Telegram notification for cancellation
+  const tgItems = (canceledOrder.items ?? []).map(i => `• ${i.name} × ${i.qty ?? 1}`).join('\n')
+  sendTelegram(
+    `<b>❌ Order #${canceledOrder.id} canceled</b>\n\n` +
+    `<b>Customer:</b> ${canceledOrder.name} (${canceledOrder.email})\n` +
+    `<b>Items:</b>\n${tgItems}\n\n` +
+    `<b>Total:</b> ${canceledOrder.total}`,
+    canceledOrder.university
+  )
+
   res.json({ ok: true, order: canceledOrder })
 })
 
@@ -345,13 +358,13 @@ orderAdminRouter.put('/:id/status', async (req, res) => {
       subject: `Order #${order.id} ${statusMessages[status].title} — Lacosta`,
       university: order.university,
       html: `
-        <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-          <h2 style="color:#65a30d">${statusMessages[status].title}</h2>
-          <p>Hi ${order.name},</p>
-          <p>${statusMessages[status].body}</p>
-          <p><strong>Order #${order.id}</strong></p>
-          <p><strong>Items:</strong> ${(order.items ?? []).map(i => `${i.name} x${i.qty ?? 1}`).join(', ')}</p>
-          <p><strong>Total:</strong> ${order.total}</p>
+        <div style="padding:40px 32px;text-align:center;">
+          <img src="${config.baseUrl}/logo.png" alt="Lacosta" width="48" height="48" style="border-radius:12px;margin-bottom:16px;">
+          <h2 style="font-size:22px;font-weight:700;color:#1a1a1a;margin:0 0 8px;">${statusMessages[status].title}</h2>
+          <p style="font-size:15px;color:#52525b;margin:0 0 16px;">Hi ${order.name}, ${statusMessages[status].body}</p>
+          <p style="font-size:14px;color:#52525b;margin:0 0 4px;"><strong>Order #${order.id}</strong></p>
+          <p style="font-size:14px;color:#52525b;margin:0 0 4px;"><strong>Items:</strong> ${(order.items ?? []).map(i => `${i.name} x${i.qty ?? 1}`).join(', ')}</p>
+          <p style="font-size:14px;color:#52525b;margin:0;"><strong>Total:</strong> ${order.total}</p>
         </div>
       `,
     }).catch(() => {})
@@ -374,6 +387,19 @@ orderAdminRouter.put('/:id/status', async (req, res) => {
         </div>
       `,
     }).catch(() => {})
+  }
+
+  // Telegram notification for status changes
+  if (statusMessages[status]) {
+    const tgItems = (order.items ?? []).map(i => `• ${i.name} × ${i.qty ?? 1}`).join('\n')
+    const statusEmoji = { confirmed: '✅', canceled: '❌', delivered: '📦' }
+    sendTelegram(
+      `${statusEmoji[status] ?? '📋'} <b>Order #${order.id} ${statusMessages[status].title}</b>\n\n` +
+      `<b>Customer:</b> ${order.name} (${order.email})\n` +
+      `<b>Items:</b>\n${tgItems}\n\n` +
+      `<b>Total:</b> ${order.total}`,
+      order.university
+    )
   }
 
   res.json({ ok: true, order })
