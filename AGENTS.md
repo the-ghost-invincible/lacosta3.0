@@ -37,11 +37,13 @@ dist/          → Vite build output (production)
 - `index.js` — Express app, route mounting, admin sessions, middleware, rate limiters with custom `keyGenerator`
 - `db.js` — PostgreSQL pool, schema init, auto-migrations
 - `auth.js` — User registration, login, email verification, password reset
+- `helpers.js` — Shared utilities: `hashPassword`, `verifyPassword`, `requireUser`, `getNotifyEmail`
 - `payments.js` — Lipana SDK wrapper (per-university), phone normalization, webhook signature verification
 - `payment-routes.js` — Payment HTTP routes (STK push, webhook, admin config)
-- `orders.js` — Order placement, status updates, stock deduction/restore helpers, admin/customer email notifications
+- `orders.js` — Order placement, status updates, stock deduction/restore helpers, admin/customer email + Telegram notifications
 - `cart.js` — Per-user cart CRUD
-- `email.js` — Resend email service (per-university sender via `universities.email` column)
+- `email.js` — Resend email service (auto display name, plain text fallback, auto reply-to)
+- `telegram.js` — Telegram bot notifications per university
 - `config.js` — Centralized env var config
 - `seo.js` — Dynamic sitemap.xml + robots.txt
 - `error-tracker.js` — Sentry error reporting
@@ -49,8 +51,9 @@ dist/          → Vite build output (production)
 ### Frontend (`src/`)
 - `App.jsx` — Root component, route definitions
 - `AuthContext.jsx` — Auth state + API calls context provider
-- `CartContext.jsx` — Cart state + server sync context provider
+- `CartContext.jsx` — Cart state + server sync context provider (user-scoped localStorage)
 - `Cart.jsx` — Shopping cart + checkout + M-Pesa payment flow
+- `History.jsx` — Purchase history page (user-scoped localStorage)
 - `Home.jsx` — Landing page (hero, deals, catalog, trending)
 - `Category.jsx` — Category browsing with subcategory menus
 - `Header.jsx` — Topbar, search, category strip, mobile nav
@@ -93,9 +96,33 @@ Emails are sent via Resend API. Two types:
 
 Email sender address: per-university `email` column in `universities` table, falls back to `EMAIL_FROM` env var.
 
+Email deliverability features (in `email.js`):
+- Auto display name: bare emails like `noreply@domain.com` get wrapped as `Lacosta <noreply@domain.com>`
+- Plain text fallback: `stripHtml()` generates a text version alongside HTML
+- Auto reply-to: all emails include `Reply-To` header from `ADMIN_EMAIL` env var
+
+## Notifications
+
+### Email Notifications
+- Order placed → customer + admin
+- Order status changed (confirmed/canceled/delivered) → customer + admin
+- Payment confirmed → customer + admin
+- Email verification, password reset → user
+
+### Telegram Notifications
+Per-university Telegram bot sends alerts for:
+- New orders placed
+- Payments received
+- Orders canceled (by customer or admin)
+- Order status changes (confirmed/delivered)
+
+Configured via admin panel (requires super user password to save).
+
 ## Database Schema
 
 9 tables: `users`, `sessions`, `carts`, `orders`, `products`, `universities`, `site_data`, `tokens`, `daily_sales`
+
+Universities table columns include: `name`, `slug`, `email` (sender address), `notify_email` (admin alerts), `lipana_*` (payment), `telegram_*` (notifications).
 
 Migrations run automatically via `ALTER TABLE ADD COLUMN IF NOT EXISTS` in `db.js`.
 
@@ -104,6 +131,8 @@ Migrations run automatically via `ALTER TABLE ADD COLUMN IF NOT EXISTS` in `db.j
 Located at secret URL (`/admin-7f3k9`). Two roles:
 - **Superuser** — full access to all universities, can configure payment keys
 - **Sub-user** (university admin) — scoped to their university, can see till number but NOT API keys
+
+Sensitive config (Telegram bot token, chat ID) requires super user password to save.
 
 ## Environment Variables
 
@@ -196,6 +225,7 @@ pm2 stop lacosta-api    # Stop app
 - University scoping: most queries filter by `university` column
 - Real-time sync: frontend polls `/api/data` every 5s, stock every 10s
 - Rate limiters use custom `keyGenerator` to handle proxied IPs (Cloudflare/Nginx)
+- User data isolation: localStorage keys are scoped by user ID (`lacosta-cart-{userId}`, `lacosta_history-{userId}`) to prevent cross-user data leakage when switching accounts
 
 ## Universities (in database)
 
