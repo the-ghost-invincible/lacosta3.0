@@ -2,16 +2,21 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from './Header'
 import { useCart } from './CartContext'
+import { useAuth } from './AuthContext'
 import './App.css'
 
-const HISTORY_KEY = 'lacosta_history'
+const BASE_HISTORY_KEY = 'lacosta_history'
 
-function loadHistory() {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) ?? [] } catch { return [] }
+function historyKey(userId) {
+  return userId ? `${BASE_HISTORY_KEY}-${userId}` : BASE_HISTORY_KEY
 }
 
-function clearHistory() {
-  localStorage.removeItem(HISTORY_KEY)
+function loadHistory(userId) {
+  try { return JSON.parse(localStorage.getItem(historyKey(userId))) ?? [] } catch { return [] }
+}
+
+function clearHistory(userId) {
+  localStorage.removeItem(historyKey(userId))
 }
 
 const STATUS_LABELS = {
@@ -33,11 +38,12 @@ const STATUS_CLASSES = {
 export function HistoryPage() {
   const navigate = useNavigate()
   const { addToCart } = useCart()
+  const { user } = useAuth()
   const [history, setHistory] = useState([])
   const [orderStatuses, setOrderStatuses] = useState({})
 
   useEffect(() => {
-    const loaded = loadHistory()
+    const loaded = loadHistory(user?.id)
     setHistory(loaded)
 
     const fetchStatuses = async () => {
@@ -60,13 +66,13 @@ export function HistoryPage() {
     fetchStatuses()
     const interval = setInterval(fetchStatuses, 10000)
     return () => clearInterval(interval)
-  }, [])
+  }, [user?.id])
 
   const removeEntry = (id) => {
     if (!confirm('Remove this entry from history?')) return
     const next = history.filter((h) => h.id !== id)
     setHistory(next)
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
+    localStorage.setItem(historyKey(user?.id), JSON.stringify(next))
   }
 
   const cancelOrder = async (orderId) => {
@@ -86,7 +92,7 @@ export function HistoryPage() {
 
   const clearAll = () => {
     if (!confirm('Clear entire purchase history?')) return
-    clearHistory()
+    clearHistory(user?.id)
     setHistory([])
   }
 

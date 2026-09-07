@@ -3,11 +3,15 @@ import { useAuth } from './AuthContext'
 import { parsePrice } from './utils'
 
 const CartContext = createContext(null)
-const STORAGE_KEY = 'lacosta-cart'
+const BASE_STORAGE_KEY = 'lacosta-cart'
 
-const loadCart = () => {
+function storageKey(userId) {
+  return userId ? `${BASE_STORAGE_KEY}-${userId}` : BASE_STORAGE_KEY
+}
+
+const loadCart = (userId) => {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) ?? []
+    return JSON.parse(localStorage.getItem(storageKey(userId))) ?? []
   } catch {
     return []
   }
@@ -27,30 +31,33 @@ export function CartProvider({ children }) {
     const wasSignedIn = Boolean(prevUserRef.current)
     const prevUserId = prevUserRef.current?.id
     prevUserRef.current = user
+    const userId = user?.id ?? null
     if (user) {
       if (wasSignedIn && prevUserId !== user.id) {
-        localStorage.removeItem(STORAGE_KEY)
+        localStorage.removeItem(storageKey(prevUserId))
+        localStorage.removeItem(storageKey(null))
       }
       fetch('/api/cart')
         .then((res) => res.json())
         .then((data) => {
           if (cancelled) return
           const serverItems = Array.isArray(data.items) ? data.items : []
-          const merged = serverItems.length ? serverItems : loadCart()
+          const merged = serverItems.length ? serverItems : loadCart(userId)
           setItems(merged)
           setReady(true)
         })
         .catch(() => {
           if (cancelled) return
-          setItems(loadCart())
+          setItems(loadCart(userId))
           setReady(true)
         })
     } else {
       if (wasSignedIn) {
-        localStorage.removeItem(STORAGE_KEY)
+        localStorage.removeItem(storageKey(prevUserId))
+        localStorage.removeItem(storageKey(null))
         setItems([])
       } else {
-        setItems(loadCart())
+        setItems(loadCart(null))
       }
       setReady(true)
     }
@@ -61,7 +68,8 @@ export function CartProvider({ children }) {
   // localStorage as a mirror (covers page reloads and expired sessions).
   useEffect(() => {
     if (!ready) return
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+    const userId = user?.id ?? null
+    localStorage.setItem(storageKey(userId), JSON.stringify(items))
     if (user) {
       fetch('/api/cart', {
         method: 'PUT',

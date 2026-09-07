@@ -12,14 +12,18 @@ const prefixOf = (price) => {
 
 const formatMoney = (n, prefix = "KSh") => `${prefix} ${n.toLocaleString()}`
 
-const HISTORY_KEY = 'lacosta_history'
+const BASE_HISTORY_KEY = 'lacosta_history'
 
-function loadHistory() {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) ?? [] } catch { return [] }
+function historyKey(userId) {
+  return userId ? `${BASE_HISTORY_KEY}-${userId}` : BASE_HISTORY_KEY
 }
 
-function saveToHistory(items, total, currency, serverOrderId = null) {
-  const history = loadHistory()
+function loadHistory(userId) {
+  try { return JSON.parse(localStorage.getItem(historyKey(userId))) ?? [] } catch { return [] }
+}
+
+function saveToHistory(userId, items, total, currency, serverOrderId = null) {
+  const history = loadHistory(userId)
   history.unshift({
     id: Date.now(),
     date: new Date().toISOString(),
@@ -27,7 +31,7 @@ function saveToHistory(items, total, currency, serverOrderId = null) {
     total: formatMoney(total, currency),
     orderId: serverOrderId,
   })
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
+  localStorage.setItem(historyKey(userId), JSON.stringify(history))
 }
 
 export function CartPage() {
@@ -97,7 +101,7 @@ export function CartPage() {
     const data = await res.json().catch(() => ({}))
     setPhoneOpen(false)
     setOrderId(data.order?.id ?? null)
-    saveToHistory(items, total, currency, data.order?.id ?? null)
+    saveToHistory(user.id, items, total, currency, data.order?.id ?? null)
     setOrderPlaced(true)
     setBusy(false)
 
