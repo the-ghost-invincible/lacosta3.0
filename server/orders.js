@@ -1,8 +1,8 @@
 import { Router } from 'express'
 import { pool } from './db.js'
-import { userFromSession } from './auth.js'
 import { sendEmail } from './email.js'
 import { config } from './config.js'
+import { requireUser, getNotifyEmail } from './helpers.js'
 
 const STATUSES = ['pending', 'confirmed', 'canceled', 'delivered']
 
@@ -88,24 +88,7 @@ export async function reverseDailySale(order) {
   )
 }
 
-async function getNotifyEmail(university) {
-  if (!university) return config.adminEmail || null
-  try {
-    const result = await pool.query('SELECT notify_email FROM universities WHERE slug = $1', [university])
-    return result.rows[0]?.notify_email || config.adminEmail || null
-  } catch {
-    return config.adminEmail || null
-  }
-}
-
 export const orderRouter = Router()
-
-async function requireUser(req, res, next) {
-  const user = await userFromSession(req)
-  if (!user) return res.status(401).json({ error: 'Not signed in' })
-  req.user = user
-  next()
-}
 
 const parsePrice = (price) => Number(String(price ?? '').replace(/[^\d]/g, '')) || 0
 

@@ -1,15 +1,8 @@
 import { Router } from 'express'
 import { pool } from './db.js'
-import { userFromSession } from './auth.js'
+import { requireUser } from './helpers.js'
 
 const router = Router()
-
-async function requireUser(req, res, next) {
-  const user = await userFromSession(req)
-  if (!user) return res.status(401).json({ error: 'Not signed in' })
-  req.user = user
-  next()
-}
 
 // The signed-in user's saved cart
 router.get('/', requireUser, async (req, res) => {

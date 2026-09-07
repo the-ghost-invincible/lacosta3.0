@@ -45,9 +45,9 @@ if (DATABASE_URL) {
       const value = payload[section]
       if (value !== undefined) {
         await pool.query(
-          `INSERT INTO site_data (section, value, updated_at)
-           VALUES ($1, $2, now())
-           ON CONFLICT (section) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+          `INSERT INTO site_data (section, university, value, updated_at)
+           VALUES ($1, 'default', $2, now())
+           ON CONFLICT (section, university) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
           [section, JSON.stringify(value)]
         )
       }

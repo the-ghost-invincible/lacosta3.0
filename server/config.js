@@ -5,11 +5,19 @@
 
 export const config = {
   port: Number(process.env.PORT) || 4000,
-  adminPassword: process.env.ADMIN_PASSWORD ?? 'lacosta-admin',
-  superUserPassword: process.env.SUPERUSER_PASSWORD ?? 'qazwsxedc',
+  adminPassword: process.env.ADMIN_PASSWORD,
+  superUserPassword: process.env.SUPERUSER_PASSWORD,
   adminPath: process.env.ADMIN_PATH ?? '/admin-7f3k9',
   resendApiKey: process.env.RESEND_API_KEY ?? '',
   emailFrom: process.env.EMAIL_FROM ?? 'Lacosta <noreply@localhost>',
   adminEmail: process.env.ADMIN_EMAIL ?? '',
   baseUrl: process.env.BASE_URL ?? 'http://localhost:4000',
+}
+
+const missing = []
+if (!config.adminPassword) missing.push('ADMIN_PASSWORD')
+if (!config.superUserPassword) missing.push('SUPERUSER_PASSWORD')
+if (missing.length) {
+  console.error(`FATAL: Missing required environment variables: ${missing.join(', ')}`)
+  process.exit(1)
 }

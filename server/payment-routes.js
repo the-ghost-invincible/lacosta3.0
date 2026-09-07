@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import { pool } from './db.js'
-import { userFromSession } from './auth.js'
 import {
   initiateSTKPush,
   queryTransactionStatus,
@@ -12,26 +11,9 @@ import {
 } from './payments.js'
 import { deductStock } from './orders.js'
 import { sendEmail } from './email.js'
-import { config } from './config.js'
-
-async function getNotifyEmail(university) {
-  if (!university) return config.adminEmail || null
-  try {
-    const result = await pool.query('SELECT notify_email FROM universities WHERE slug = $1', [university])
-    return result.rows[0]?.notify_email || config.adminEmail || null
-  } catch {
-    return config.adminEmail || null
-  }
-}
+import { requireUser, getNotifyEmail } from './helpers.js'
 
 const router = Router()
-
-async function requireUser(req, res, next) {
-  const user = await userFromSession(req)
-  if (!user) return res.status(401).json({ error: 'Not signed in' })
-  req.user = user
-  next()
-}
 
 // ---------- Payment config (per university, public) ----------
 router.get('/config/:university', async (req, res) => {
@@ -178,7 +160,12 @@ router.post('/webhook/:universitySlug', async (req, res) => {
       return res.status(200).json({ ok: true })
     }
 
-    // Update order payment status
+    // Update order payment status (skip if already paid — webhook idempotency)
+    if (order.payment_status === 'paid') {
+      console.log(`[webhook] Order #${order.id} already paid, skipping`)
+      return res.status(200).json({ ok: true })
+    }
+
     const result = await pool.query(
       `UPDATE orders
        SET payment_status = $1, payment_receipt = $2, updated_at = now()

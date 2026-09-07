@@ -15,21 +15,7 @@ import { orderRouter, orderAdminRouter, getCustomers } from './orders.js'
 import { paymentRouter, getPaymentConfigAdmin, savePaymentConfigAdmin } from './payment-routes.js'
 import { errorHandler } from './error-tracker.js'
 import { seoRouter } from './seo.js'
-
-// Password hashing for university passwords (scrypt, same as auth.js)
-const keylen = 64
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString('hex')
-  const hash = crypto.scryptSync(password, salt, keylen).toString('hex')
-  return `${salt}:${hash}`
-}
-function verifyPassword(password, stored) {
-  const [salt, hash] = String(stored ?? '').split(':')
-  if (!salt || !hash) return false
-  const candidate = crypto.scryptSync(password, salt, keylen)
-  const expected = Buffer.from(hash, 'hex')
-  return candidate.length === expected.length && crypto.timingSafeEqual(candidate, expected)
-}
+import { hashPassword, verifyPassword } from './helpers.js'
 
 const root = path.resolve(import.meta.dirname, '..')
 const dataFile = path.join(import.meta.dirname, 'data.json')
@@ -47,7 +33,32 @@ const SECTIONS = [
   'categoryMenus',
 ]
 
-const sessions = new Set()
+// Admin sessions with expiration (Map<token, expiresAt>)
+const sessions = new Map()
+const ADMIN_SESSION_TTL = 7 * 24 * 60 * 60 * 1000 // 7 days
+
+function createAdminSession(token) {
+  sessions.set(token, Date.now() + ADMIN_SESSION_TTL)
+}
+
+function isAdminSessionValid(token) {
+  if (!token) return false
+  const expiresAt = sessions.get(token)
+  if (!expiresAt) return false
+  if (Date.now() > expiresAt) {
+    sessions.delete(token)
+    return false
+  }
+  return true
+}
+
+// Periodically clean expired sessions (every 10 minutes)
+setInterval(() => {
+  const now = Date.now()
+  for (const [token, expiresAt] of sessions) {
+    if (now > expiresAt) sessions.delete(token)
+  }
+}, 10 * 60 * 1000)
 
 // Cache for site data (refreshed periodically)
 let siteDataCache = null
@@ -228,7 +239,7 @@ app.use(express.json({ limit: '2mb' }))
 app.use(cookieParser())
 
 function requireAuth(req, res, next) {
-  if (sessions.has(req.cookies.adminToken)) return next()
+  if (isAdminSessionValid(req.cookies.adminToken)) return next()
   res.status(401).json({ error: 'Unauthorized' })
 }
 
@@ -361,7 +372,7 @@ app.post('/api/login', authLimiter, (req, res) => {
   const { password } = req.body ?? {}
   if (password === config.adminPassword) {
     const token = crypto.randomBytes(24).toString('hex')
-    sessions.add(token)
+    createAdminSession(token)
     res.cookie('adminToken', token, {
       httpOnly: true,
       sameSite: 'lax',
@@ -379,7 +390,7 @@ app.post('/api/logout', (_req, res) => {
 })
 
 app.get('/api/admin/me', async (req, res) => {
-  if (sessions.has(req.cookies.adminToken)) return res.json({ ok: true, role: 'superuser' })
+  if (isAdminSessionValid(req.cookies.adminToken)) return res.json({ ok: true, role: 'superuser' })
   if (req.cookies.uniAdminToken && uniSessions.has(req.cookies.uniAdminToken)) {
     const slug = req.cookies.uniAdminUniversity
     try {
@@ -432,7 +443,7 @@ app.post('/api/uni-logout', (req, res) => {
 
 // Middleware: accept both admin (superuser) and sub-user tokens
 function requireAnyAdmin(req, res, next) {
-  if (sessions.has(req.cookies.adminToken)) {
+  if (isAdminSessionValid(req.cookies.adminToken)) {
     req.adminRole = 'superuser'
     return next()
   }

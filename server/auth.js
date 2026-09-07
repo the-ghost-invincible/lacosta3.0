@@ -3,6 +3,7 @@ import crypto from 'node:crypto'
 import { pool } from './db.js'
 import { sendEmail } from './email.js'
 import { config } from './config.js'
+import { hashPassword, verifyPassword } from './helpers.js'
 
 const router = Router()
 
@@ -33,23 +34,6 @@ const publicUser = (row) => ({
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const USERNAME_RE = /^[a-z0-9][a-z0-9_-]{2,19}$/i
 const PHONE_RE = /^\+?[0-9][0-9\s\-]{8,14}$/
-
-// ---------- Password hashing (scrypt, salted) ----------
-const keylen = 64
-
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString('hex')
-  const hash = crypto.scryptSync(password, salt, keylen).toString('hex')
-  return `${salt}:${hash}`
-}
-
-function verifyPassword(password, stored) {
-  const [salt, hash] = String(stored ?? '').split(':')
-  if (!salt || !hash) return false
-  const candidate = crypto.scryptSync(password, salt, keylen)
-  const expected = Buffer.from(hash, 'hex')
-  return candidate.length === expected.length && crypto.timingSafeEqual(candidate, expected)
-}
 
 // ---------- Register ----------
 router.post('/register', async (req, res) => {
