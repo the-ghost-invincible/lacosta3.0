@@ -17,6 +17,13 @@ import { errorHandler } from './error-tracker.js'
 import { seoRouter } from './seo.js'
 import { hashPassword, verifyPassword } from './helpers.js'
 
+function safeCompare(a, b) {
+  const bufA = Buffer.from(String(a ?? ''))
+  const bufB = Buffer.from(String(b ?? ''))
+  if (bufA.length !== bufB.length) return false
+  return crypto.timingSafeEqual(bufA, bufB)
+}
+
 const root = path.resolve(import.meta.dirname, '..')
 const dataFile = path.join(import.meta.dirname, 'data.json')
 const uploadsDir = path.join(root, 'public', 'uploads')
@@ -33,37 +40,35 @@ const SECTIONS = [
   'categoryMenus',
 ]
 
-// Admin sessions with expiration (Map<token, expiresAt>)
-const sessions = new Map()
+// Admin sessions stored in DB (survives restarts)
 const ADMIN_SESSION_TTL = 7 * 24 * 60 * 60 * 1000 // 7 days
 
-function createAdminSession(token) {
-  sessions.set(token, Date.now() + ADMIN_SESSION_TTL)
+async function createAdminSession(token, role = 'superuser', university = null) {
+  const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL)
+  await pool.query(
+    'INSERT INTO admin_sessions (token, role, university, expires_at) VALUES ($1, $2, $3, $4)',
+    [token, role, university, expiresAt]
+  )
 }
 
-function isAdminSessionValid(token) {
-  if (!token) return false
-  const expiresAt = sessions.get(token)
-  if (!expiresAt) return false
-  if (Date.now() > expiresAt) {
-    sessions.delete(token)
-    return false
-  }
-  return true
+async function isAdminSessionValid(token) {
+  if (!token) return null
+  const result = await pool.query(
+    'SELECT role, university FROM admin_sessions WHERE token = $1 AND expires_at > now()',
+    [token]
+  )
+  return result.rows[0] || null
 }
 
-// Periodically clean expired sessions (every 10 minutes)
+// Periodically clean expired admin sessions (every 10 minutes)
 setInterval(() => {
-  const now = Date.now()
-  for (const [token, expiresAt] of sessions) {
-    if (now > expiresAt) sessions.delete(token)
-  }
+  pool.query('DELETE FROM admin_sessions WHERE expires_at < now()').catch(() => {})
 }, 10 * 60 * 1000)
 
 // Cache for site data (refreshed periodically)
 let siteDataCache = null
 let siteDataCacheTime = 0
-const SITE_CACHE_TTL = 5000 // 5 seconds
+const SITE_CACHE_TTL = 30000 // 30 seconds
 
 // Allow other modules (e.g. orders.js) to invalidate the cache
 process.on('invalidate-data-cache', () => {
@@ -238,8 +243,13 @@ const authLimiter = rateLimit({
 app.use(express.json({ limit: '2mb' }))
 app.use(cookieParser())
 
-function requireAuth(req, res, next) {
-  if (isAdminSessionValid(req.cookies.adminToken)) return next()
+async function requireAuth(req, res, next) {
+  const session = await isAdminSessionValid(req.cookies.adminToken)
+  if (session) {
+    req.adminRole = session.role
+    req.adminUniversity = session.university
+    return next()
+  }
   res.status(401).json({ error: 'Unauthorized' })
 }
 
@@ -368,11 +378,11 @@ app.put('/api/payments/config/:university', requireAnyAdmin, savePaymentConfigAd
 app.use(seoRouter)
 
 // ---------- Auth (admin login) ----------
-app.post('/api/login', authLimiter, (req, res) => {
+app.post('/api/login', authLimiter, async (req, res) => {
   const { password } = req.body ?? {}
-  if (password === config.adminPassword) {
+  if (safeCompare(password, config.adminPassword)) {
     const token = crypto.randomBytes(24).toString('hex')
-    createAdminSession(token)
+    await createAdminSession(token, 'superuser')
     res.cookie('adminToken', token, {
       httpOnly: true,
       sameSite: 'lax',
@@ -384,28 +394,22 @@ app.post('/api/login', authLimiter, (req, res) => {
   }
 })
 
-app.post('/api/logout', (_req, res) => {
+app.post('/api/logout', async (req, res) => {
+  const token = req.cookies.adminToken
+  if (token) {
+    await pool.query('DELETE FROM admin_sessions WHERE token = $1', [token])
+  }
   res.clearCookie('adminToken')
   res.json({ ok: true })
 })
 
 app.get('/api/admin/me', async (req, res) => {
-  if (isAdminSessionValid(req.cookies.adminToken)) return res.json({ ok: true, role: 'superuser' })
-  if (req.cookies.uniAdminToken && uniSessions.has(req.cookies.uniAdminToken)) {
-    const slug = req.cookies.uniAdminUniversity
-    try {
-      const result = await pool.query('SELECT name FROM universities WHERE slug = $1', [slug])
-      const name = result.rows[0]?.name || slug
-      return res.json({ ok: true, role: 'subuser', university: slug, universityName: name })
-    } catch {
-      return res.json({ ok: true, role: 'subuser', university: slug, universityName: slug })
-    }
+  const session = await isAdminSessionValid(req.cookies.adminToken)
+  if (session) {
+    return res.json({ ok: true, role: session.role, university: session.university, universityName: session.university })
   }
   res.status(401).json({ error: 'Unauthorized' })
 })
-
-// ---------- University sub-user sessions ----------
-const uniSessions = new Set()
 
 // ---------- University sub-user login ----------
 app.post('/api/uni-login', authLimiter, async (req, res) => {
@@ -423,33 +427,28 @@ app.post('/api/uni-login', authLimiter, async (req, res) => {
   }
 
   const token = crypto.randomBytes(24).toString('hex')
-  uniSessions.add(token)
-  res.cookie('uniAdminToken', token, {
+  await createAdminSession(token, 'subuser', slug)
+  res.cookie('adminToken', token, {
     httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000,
-  })
-  res.cookie('uniAdminUniversity', slug, {
-    httpOnly: false, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000,
   })
   res.json({ ok: true, university: slug })
 })
 
-app.post('/api/uni-logout', (req, res) => {
-  const token = req.cookies.uniAdminToken
-  if (token) uniSessions.delete(token)
-  res.clearCookie('uniAdminToken')
-  res.clearCookie('uniAdminUniversity')
+app.post('/api/uni-logout', async (req, res) => {
+  const token = req.cookies.adminToken
+  if (token) {
+    await pool.query('DELETE FROM admin_sessions WHERE token = $1', [token])
+  }
+  res.clearCookie('adminToken')
   res.json({ ok: true })
 })
 
 // Middleware: accept both admin (superuser) and sub-user tokens
-function requireAnyAdmin(req, res, next) {
-  if (isAdminSessionValid(req.cookies.adminToken)) {
-    req.adminRole = 'superuser'
-    return next()
-  }
-  if (req.cookies.uniAdminToken && uniSessions.has(req.cookies.uniAdminToken)) {
-    req.adminRole = 'subuser'
-    req.adminUniversity = req.cookies.uniAdminUniversity
+async function requireAnyAdmin(req, res, next) {
+  const session = await isAdminSessionValid(req.cookies.adminToken)
+  if (session) {
+    req.adminRole = session.role
+    req.adminUniversity = session.university
     return next()
   }
   res.status(401).json({ error: 'Unauthorized' })
@@ -458,7 +457,7 @@ function requireAnyAdmin(req, res, next) {
 // ---------- Super user password verify ----------
 app.post('/api/admin/verify-superuser', requireAnyAdmin, (req, res) => {
   const { password } = req.body ?? {}
-  if (password === config.superUserPassword) {
+  if (safeCompare(password, config.superUserPassword)) {
     res.json({ ok: true })
   } else {
     res.status(403).json({ error: 'Wrong super user password' })

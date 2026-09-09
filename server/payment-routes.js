@@ -115,15 +115,17 @@ router.post('/webhook/:universitySlug', async (req, res) => {
       return res.status(200).json({ ok: true })
     }
 
-    // Verify webhook signature
-    const signature = req.headers['x-lipana-signature'] ?? req.headers['x-lipana-signature']
-    if (signature) {
-      const rawBody = JSON.stringify(req.body)
-      const isValid = verifyWebhookSignature(rawBody, signature, payConfig.lipana_webhook_secret)
-      if (!isValid) {
-        console.warn(`[webhook] Invalid signature for university: ${universitySlug}`)
-        return res.status(401).json({ error: 'Invalid signature' })
-      }
+    // Verify webhook signature (mandatory when secret is configured)
+    const signature = req.headers['x-lipana-signature']
+    if (!signature) {
+      console.warn(`[webhook] Missing signature for university: ${universitySlug}`)
+      return res.status(401).json({ error: 'Missing signature' })
+    }
+    const rawBody = JSON.stringify(req.body)
+    const isValid = verifyWebhookSignature(rawBody, signature, payConfig.lipana_webhook_secret)
+    if (!isValid) {
+      console.warn(`[webhook] Invalid signature for university: ${universitySlug}`)
+      return res.status(401).json({ error: 'Invalid signature' })
     }
 
     const callback = parseWebhookPayload(req.body)
@@ -161,27 +163,45 @@ router.post('/webhook/:universitySlug', async (req, res) => {
       return res.status(200).json({ ok: true })
     }
 
-    // Update order payment status (skip if already paid — webhook idempotency)
-    if (order.payment_status === 'paid') {
-      console.log(`[webhook] Order #${order.id} already paid, skipping`)
-      return res.status(200).json({ ok: true })
+    // Atomic update + stock deduction in a single transaction (idempotent)
+    let updatedOrder = null
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+
+      // Atomic: only update if not already paid (idempotency guard)
+      const result = await client.query(
+        `UPDATE orders
+         SET payment_status = $1, payment_receipt = $2, updated_at = now()
+         WHERE id = $3 AND payment_status != 'paid'
+         RETURNING *`,
+        [paymentStatus, callback.receipt, order.id]
+      )
+
+      if (result.rowCount === 0) {
+        // Already paid or order not found — skip (idempotent)
+        await client.query('ROLLBACK')
+        console.log(`[webhook] Order #${order.id} already ${order.payment_status}, skipping`)
+        return res.status(200).json({ ok: true })
+      }
+
+      updatedOrder = result.rows[0]
+
+      // Deduct stock inside the same transaction
+      if (paymentStatus === 'paid') {
+        await deductStock(updatedOrder, client)
+      }
+
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      client.release()
     }
 
-    const result = await pool.query(
-      `UPDATE orders
-       SET payment_status = $1, payment_receipt = $2, updated_at = now()
-       WHERE id = $3
-       RETURNING *`,
-      [paymentStatus, callback.receipt, order.id]
-    )
-
-    const updatedOrder = result.rows[0]
-
-    // On confirmed payment: deduct stock, send emails
-    if (updatedOrder && paymentStatus === 'paid') {
-      // Deduct stock
-      await deductStock(updatedOrder)
-
+    // Notifications AFTER commit (no need to hold the lock)
+    if (paymentStatus === 'paid') {
       // Send confirmation email to customer
       sendEmail({
         to: updatedOrder.email,

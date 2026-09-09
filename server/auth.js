@@ -80,10 +80,16 @@ router.post('/register', async (req, res) => {
     to: email,
     subject: 'Verify your Lacosta account',
     university,
-    html: `<p>Welcome to Lacosta!</p>
-           <p>Click the link below to verify your email address:</p>
-           <p><a href="${verifyUrl}">Verify email</a></p>
-           <p>This link expires in 24 hours.</p>`,
+    html: `
+      <div style="padding:40px 32px;text-align:center;">
+        <img src="${config.baseUrl}/logo.png" alt="Lacosta" width="48" height="48" style="border-radius:12px;margin-bottom:16px;">
+        <h1 style="font-size:24px;font-weight:700;color:#1a1a1a;margin:0 0 8px;">Welcome to Lacosta!</h1>
+        <p style="font-size:15px;color:#52525b;margin:0 0 24px;">Thanks for signing up. Verify your email to get started.</p>
+        <a href="${verifyUrl}" style="display:inline-block;background-color:#65a30d;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;padding:14px 32px;border-radius:8px;">Verify email address</a>
+        <p style="font-size:13px;color:#a1a1aa;margin:24px 0 0;">This link expires in 24 hours.</p>
+        <p style="font-size:13px;color:#a1a1aa;margin:8px 0 0;">If you didn't create an account, you can safely ignore this email.</p>
+      </div>
+    `,
   }).catch(() => {})
 
   res.json({ ok: true, user: publicUser(user) })
@@ -252,9 +258,16 @@ router.post('/verify/resend', async (req, res) => {
     to: user.email,
     subject: 'Verify your Lacosta account',
     university: user.university,
-    html: `<p>Click the link below to verify your email address:</p>
-           <p><a href="${verifyUrl}">Verify email</a></p>
-           <p>This link expires in 24 hours.</p>`,
+    html: `
+      <div style="padding:40px 32px;text-align:center;">
+        <img src="${config.baseUrl}/logo.png" alt="Lacosta" width="48" height="48" style="border-radius:12px;margin-bottom:16px;">
+        <h1 style="font-size:24px;font-weight:700;color:#1a1a1a;margin:0 0 8px;">Verify your email</h1>
+        <p style="font-size:15px;color:#52525b;margin:0 0 24px;">Click the button below to verify your email address.</p>
+        <a href="${verifyUrl}" style="display:inline-block;background-color:#65a30d;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;padding:14px 32px;border-radius:8px;">Verify email address</a>
+        <p style="font-size:13px;color:#a1a1aa;margin:24px 0 0;">This link expires in 24 hours.</p>
+        <p style="font-size:13px;color:#a1a1aa;margin:8px 0 0;">If you didn't request this, you can safely ignore this email.</p>
+      </div>
+    `,
   }).catch(() => {})
 
   res.json({ ok: true })
@@ -287,9 +300,16 @@ router.post('/verify/resend-public', async (req, res) => {
     to: email,
     subject: 'Verify your Lacosta account',
     university: user.university,
-    html: `<p>Click the link below to verify your email address:</p>
-           <p><a href="${verifyUrl}">Verify email</a></p>
-           <p>This link expires in 24 hours.</p>`,
+    html: `
+      <div style="padding:40px 32px;text-align:center;">
+        <img src="${config.baseUrl}/logo.png" alt="Lacosta" width="48" height="48" style="border-radius:12px;margin-bottom:16px;">
+        <h1 style="font-size:24px;font-weight:700;color:#1a1a1a;margin:0 0 8px;">Verify your email</h1>
+        <p style="font-size:15px;color:#52525b;margin:0 0 24px;">Click the button below to verify your email address.</p>
+        <a href="${verifyUrl}" style="display:inline-block;background-color:#65a30d;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;padding:14px 32px;border-radius:8px;">Verify email address</a>
+        <p style="font-size:13px;color:#a1a1aa;margin:24px 0 0;">This link expires in 24 hours.</p>
+        <p style="font-size:13px;color:#a1a1aa;margin:8px 0 0;">If you didn't request this, you can safely ignore this email.</p>
+      </div>
+    `,
   }).catch(() => {})
 
   res.json({ ok: true })
@@ -322,9 +342,16 @@ router.post('/forgot-password', async (req, res) => {
     to: email,
     subject: 'Reset your Lacosta password',
     university: user.university,
-    html: `<p>You requested a password reset.</p>
-           <p><a href="${resetUrl}">Set new password</a></p>
-           <p>This link expires in 1 hour. If you didn't request this, ignore this email.</p>`,
+    html: `
+      <div style="padding:40px 32px;text-align:center;">
+        <img src="${config.baseUrl}/logo.png" alt="Lacosta" width="48" height="48" style="border-radius:12px;margin-bottom:16px;">
+        <h1 style="font-size:24px;font-weight:700;color:#1a1a1a;margin:0 0 8px;">Reset your password</h1>
+        <p style="font-size:15px;color:#52525b;margin:0 0 24px;">Click the button below to set a new password.</p>
+        <a href="${resetUrl}" style="display:inline-block;background-color:#65a30d;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;padding:14px 32px;border-radius:8px;">Reset password</a>
+        <p style="font-size:13px;color:#a1a1aa;margin:24px 0 0;">This link expires in 1 hour.</p>
+        <p style="font-size:13px;color:#a1a1aa;margin:8px 0 0;">If you didn't request this, you can safely ignore this email.</p>
+      </div>
+    `,
   }).catch(() => {})
 
   res.json({ ok: true })

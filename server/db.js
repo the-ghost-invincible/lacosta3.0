@@ -193,4 +193,36 @@ export async function initDb() {
   // Sync out_of_stock flag with quantity
   await pool.query("UPDATE products SET out_of_stock = true WHERE quantity <= 0 AND out_of_stock = false")
   await pool.query("UPDATE products SET out_of_stock = false WHERE quantity > 0 AND out_of_stock = true")
+
+  // Performance indexes
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_orders_university ON orders(university)')
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)')
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_orders_payment_ref ON orders(payment_ref)')
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC)')
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_products_university ON products(university)')
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_products_category ON products(category)')
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_products_active ON products(active)')
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_users_university ON users(university)')
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_carts_user_id ON carts(user_id)')
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_daily_sales_university_date ON daily_sales(university, sale_date)')
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)')
+
+  // Admin sessions table (replaces in-memory Map/Set)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_sessions (
+      token TEXT PRIMARY KEY,
+      role TEXT NOT NULL DEFAULT 'superuser',
+      university TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      expires_at TIMESTAMPTZ NOT NULL
+    )
+  `)
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions(expires_at)')
+
+  // Case-insensitive email uniqueness (prevents duplicate accounts)
+  try {
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(LOWER(email))')
+  } catch (err) {
+    console.warn('Could not create email uniqueness index (duplicate emails may exist):', err.message)
+  }
 }

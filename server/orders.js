@@ -9,12 +9,13 @@ const STATUSES = ['pending', 'confirmed', 'canceled', 'delivered']
 
 // ---------- Stock helpers (shared with payment-routes.js) ----------
 
-export async function deductStock(order) {
+export async function deductStock(order, client) {
+  const conn = client || pool
   const items = order.items ?? []
   for (const item of items) {
     if (!item.id) continue
     const qty = item.qty ?? 1
-    await pool.query(
+    await conn.query(
       `UPDATE products SET quantity = GREATEST(quantity - $1, 0),
        out_of_stock = CASE WHEN quantity - $1 <= 0 THEN true ELSE out_of_stock END
        WHERE id = $2 AND active = true`,
@@ -24,12 +25,13 @@ export async function deductStock(order) {
   process.emit('invalidate-data-cache')
 }
 
-export async function restoreStock(order) {
+export async function restoreStock(order, client) {
+  const conn = client || pool
   const items = order.items ?? []
   for (const item of items) {
     if (!item.id) continue
     const qty = item.qty ?? 1
-    await pool.query(
+    await conn.query(
       `UPDATE products SET quantity = quantity + $1, out_of_stock = false
        WHERE id = $2 AND active = true`,
       [qty, item.id]
@@ -103,34 +105,49 @@ orderRouter.post('/', requireUser, async (req, res) => {
   if (!phone) return res.status(400).json({ error: 'Enter a valid phone number' })
   if (items.length === 0) return res.status(400).json({ error: 'Your cart is empty' })
 
-  // Check stock availability for each item (skip if DB is unavailable)
+  let order
+  const client = await pool.connect()
   try {
+    await client.query('BEGIN')
+
+    // Check stock with row-level lock to prevent race conditions
     for (const item of items) {
       if (!item.id) continue
       const qty = item.qty ?? 1
-      const stock = await pool.query('SELECT quantity, out_of_stock, name FROM products WHERE id = $1 AND active = true', [item.id])
+      const stock = await client.query(
+        'SELECT quantity, out_of_stock, name FROM products WHERE id = $1 AND active = true FOR UPDATE',
+        [item.id]
+      )
       if (stock.rowCount === 0) {
+        await client.query('ROLLBACK')
         return res.status(400).json({ error: `"${item.name}" is no longer available` })
       }
       const product = stock.rows[0]
       if (product.out_of_stock || product.quantity < qty) {
+        await client.query('ROLLBACK')
         return res.status(400).json({ error: `"${product.name}" has insufficient stock (available: ${product.quantity})` })
       }
     }
+
+    const total = items.reduce((sum, i) => sum + parsePrice(i.price) * (i.qty ?? 1), 0)
+
+    const result = await client.query(
+      `INSERT INTO orders (user_id, name, phone, email, items, total, status, university)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7) RETURNING *`,
+      [req.user.id, name, phone, req.user.email, JSON.stringify(items), `KSh ${total.toLocaleString()}`, req.user.university]
+    )
+
+    await client.query('COMMIT')
+    order = result.rows[0]
   } catch (err) {
-    console.error('Stock check skipped (DB unavailable):', err.message)
+    await client.query('ROLLBACK').catch(() => {})
+    console.error('Order placement failed:', err.message)
+    return res.status(500).json({ error: 'Failed to place order' })
+  } finally {
+    client.release()
   }
 
-  const total = items.reduce((sum, i) => sum + parsePrice(i.price) * (i.qty ?? 1), 0)
-
-  const result = await pool.query(
-    `INSERT INTO orders (user_id, name, phone, email, items, total, status, university)
-     VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7) RETURNING *`,
-    [req.user.id, name, phone, req.user.email, JSON.stringify(items), `KSh ${total.toLocaleString()}`, req.user.university]
-  )
-
-  const order = result.rows[0]
-
+  // Notifications AFTER commit (no need to hold the lock)
   await trackDailySale(order, false)
 
   // Send order confirmation email
@@ -405,7 +422,7 @@ orderAdminRouter.put('/:id/status', async (req, res) => {
   res.json({ ok: true, order })
 })
 
-// Update an order's payment status (admin)
+// Update an order's payment status (admin) — uses transaction for idempotent stock changes
 orderAdminRouter.put('/:id/payment', async (req, res) => {
   const { payment_status } = req.body ?? {}
   const allowed = ['pending', 'paid', 'failed']
@@ -413,28 +430,47 @@ orderAdminRouter.put('/:id/payment', async (req, res) => {
     return res.status(400).json({ error: 'Invalid payment_status' })
   }
 
-  // Fetch current order to check previous payment status
-  const existing = await pool.query('SELECT * FROM orders WHERE id = $1', [req.params.id])
-  if (existing.rowCount === 0) return res.status(404).json({ error: 'Order not found' })
-  const order = existing.rows[0]
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
 
-  // Subtract stock when marking as paid (only if not already paid)
-  if (payment_status === 'paid' && order.payment_status !== 'paid') {
-    await deductStock(order)
-    await trackDailySale(order, true)
+    // Lock the order row to prevent concurrent payment status changes
+    const existing = await client.query(
+      'SELECT * FROM orders WHERE id = $1 FOR UPDATE',
+      [req.params.id]
+    )
+    if (existing.rowCount === 0) {
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: 'Order not found' })
+    }
+    const order = existing.rows[0]
+
+    // Subtract stock when marking as paid (only if not already paid)
+    if (payment_status === 'paid' && order.payment_status !== 'paid') {
+      await deductStock(order, client)
+      await trackDailySale(order, true)
+    }
+
+    // Restore stock if un-marking as paid (revert the deduction)
+    if (payment_status !== 'paid' && order.payment_status === 'paid') {
+      await restoreStock(order, client)
+      await reverseDailySale(order)
+    }
+
+    const result = await client.query(
+      'UPDATE orders SET payment_status = $1 WHERE id = $2 RETURNING *',
+      [payment_status, req.params.id]
+    )
+
+    await client.query('COMMIT')
+    res.json({ ok: true, order: result.rows[0] })
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {})
+    console.error('Payment status update failed:', err.message)
+    res.status(500).json({ error: 'Failed to update payment status' })
+  } finally {
+    client.release()
   }
-
-  // Restore stock if un-marking as paid (revert the deduction)
-  if (payment_status !== 'paid' && order.payment_status === 'paid') {
-    await restoreStock(order)
-    await reverseDailySale(order)
-  }
-
-  const result = await pool.query(
-    'UPDATE orders SET payment_status = $1 WHERE id = $2 RETURNING *',
-    [payment_status, req.params.id]
-  )
-  res.json({ ok: true, order: result.rows[0] })
 })
 
 // Delete a user permanently (admin, requires password confirmation)
@@ -442,7 +478,6 @@ orderAdminRouter.delete('/user/:id', async (req, res) => {
   const password = String(req.body?.password ?? '')
   if (!password) return res.status(400).json({ error: 'Password required' })
 
-  const { config } = await import('./config.js')
   if (password !== config.superUserPassword) {
     return res.status(403).json({ error: 'Incorrect password' })
   }
@@ -459,7 +494,6 @@ orderAdminRouter.delete('/:id', async (req, res) => {
   const password = String(req.body?.password ?? '')
   if (!password) return res.status(400).json({ error: 'Super user password required' })
 
-  const { config } = await import('./config.js')
   if (password !== config.superUserPassword) {
     return res.status(403).json({ error: 'Wrong super user password' })
   }
