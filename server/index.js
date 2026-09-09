@@ -100,10 +100,16 @@ async function readData(university) {
       dbData[row.section] = row.value
     }
 
-    // Products are always visible to everyone (no university filter)
-    const productsResult = await pool.query(
-      'SELECT * FROM products WHERE active = true ORDER BY id'
-    )
+    // Products: filter by university when logged in, show all when not logged in
+    let productsQuery, productsParams
+    if (uniFilter === 'default') {
+      productsQuery = 'SELECT * FROM products WHERE active = true ORDER BY id'
+      productsParams = []
+    } else {
+      productsQuery = 'SELECT * FROM products WHERE active = true AND university = $1 ORDER BY id'
+      productsParams = [uniFilter]
+    }
+    const productsResult = await pool.query(productsQuery, productsParams)
     dbData.catalogProducts = productsResult.rows.map(p => {
       const images = p.images?.length ? p.images : (p.image ? [p.image] : [])
       const priceNum = (p.price_num ?? parseFloat(String(p.price ?? '').replace(/[^\d.]/g, ''))) || 0
