@@ -1194,6 +1194,7 @@ const PAYMENT_STATUS_LABELS = { pending: 'Unpaid', paid: 'Paid', failed: 'Failed
 function CustomersTab({ university, role }) {
   const [customers, setCustomers] = useState([])
   const [refreshing, setRefreshing] = useState(false)
+  const [search, setSearch] = useState('')
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deletePassword, setDeletePassword] = useState('')
   const [deleteError, setDeleteError] = useState(null)
@@ -1300,6 +1301,17 @@ function CustomersTab({ university, role }) {
         </button>
       </div>
 
+      {customers.length > 0 && (
+        <input
+          className="search-box"
+          type="text"
+          placeholder="Search by name, email, phone…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ marginBottom: '12px' }}
+        />
+      )}
+
       {customers.length === 0 ? (
         <p className="muted">No registered users yet. When a customer signs in, they appear here with their live cart.</p>
       ) : (
@@ -1315,7 +1327,16 @@ function CustomersTab({ university, role }) {
               </tr>
             </thead>
             <tbody>
-              {customers.map((c) => {
+              {customers.filter((c) => {
+                if (!search) return true
+                const q = search.toLowerCase()
+                return (
+                  (c.displayName || '').toLowerCase().includes(q) ||
+                  (c.username || '').toLowerCase().includes(q) ||
+                  (c.email || '').toLowerCase().includes(q) ||
+                  (c.phone || '').toLowerCase().includes(q)
+                )
+              }).map((c) => {
                 const items = c.items ?? []
                 return (
                   <tr key={c.id}>
