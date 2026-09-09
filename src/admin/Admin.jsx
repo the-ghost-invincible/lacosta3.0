@@ -1753,7 +1753,7 @@ function OrdersTab({ university, role }) {
                 <button
                   type="button"
                   className="btn paid-btn"
-                  disabled={busyId === viewOrder.id}
+                  disabled={busyId === viewOrder.id || viewOrder.status === 'canceled'}
                   onClick={async () => {
                     await setPaymentStatus(viewOrder.id, 'paid')
                     setViewOrder((prev) => prev ? { ...prev, payment_status: 'paid' } : prev)
