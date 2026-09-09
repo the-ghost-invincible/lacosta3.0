@@ -88,7 +88,6 @@ async function readData(university) {
     // Read site data sections from database for this university
     let siteQuery, siteParams
     if (uniFilter === 'default') {
-      // Not logged in — show data from all universities (merge)
       siteQuery = 'SELECT section, value FROM site_data'
       siteParams = []
     } else {
@@ -101,17 +100,10 @@ async function readData(university) {
       dbData[row.section] = row.value
     }
 
-    // Read products from database for this university
-    let productsQuery, productsParams
-    if (uniFilter === 'default') {
-      // Not logged in — show all products from all universities
-      productsQuery = 'SELECT * FROM products WHERE active = true ORDER BY id'
-      productsParams = []
-    } else {
-      productsQuery = 'SELECT * FROM products WHERE active = true AND university = $1 ORDER BY id'
-      productsParams = [uniFilter]
-    }
-    const productsResult = await pool.query(productsQuery, productsParams)
+    // Products are always visible to everyone (no university filter)
+    const productsResult = await pool.query(
+      'SELECT * FROM products WHERE active = true ORDER BY id'
+    )
     dbData.catalogProducts = productsResult.rows.map(p => {
       const images = p.images?.length ? p.images : (p.image ? [p.image] : [])
       const priceNum = (p.price_num ?? parseFloat(String(p.price ?? '').replace(/[^\d.]/g, ''))) || 0
