@@ -86,20 +86,32 @@ async function readData(university) {
     const uniFilter = university || 'default'
 
     // Read site data sections from database for this university
-    const result = await pool.query(
-      'SELECT section, value FROM site_data WHERE university = $1',
-      [uniFilter]
-    )
+    let siteQuery, siteParams
+    if (uniFilter === 'default') {
+      // Not logged in — show data from all universities (merge)
+      siteQuery = 'SELECT section, value FROM site_data'
+      siteParams = []
+    } else {
+      siteQuery = 'SELECT section, value FROM site_data WHERE university = $1'
+      siteParams = [uniFilter]
+    }
+    const result = await pool.query(siteQuery, siteParams)
     const dbData = {}
     for (const row of result.rows) {
       dbData[row.section] = row.value
     }
 
     // Read products from database for this university
-    const productsResult = await pool.query(
-      'SELECT * FROM products WHERE active = true AND university = $1 ORDER BY id',
-      [uniFilter]
-    )
+    let productsQuery, productsParams
+    if (uniFilter === 'default') {
+      // Not logged in — show all products from all universities
+      productsQuery = 'SELECT * FROM products WHERE active = true ORDER BY id'
+      productsParams = []
+    } else {
+      productsQuery = 'SELECT * FROM products WHERE active = true AND university = $1 ORDER BY id'
+      productsParams = [uniFilter]
+    }
+    const productsResult = await pool.query(productsQuery, productsParams)
     dbData.catalogProducts = productsResult.rows.map(p => {
       const images = p.images?.length ? p.images : (p.image ? [p.image] : [])
       const priceNum = (p.price_num ?? parseFloat(String(p.price ?? '').replace(/[^\d.]/g, ''))) || 0
