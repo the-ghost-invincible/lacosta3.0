@@ -716,7 +716,7 @@ function Dashboard({ role, uniSlug, uniName, onLogout, theme, onToggleTheme }) {
         ) : (
           <>
             {tab === 'products' && (
-              <ProductsTab products={db.catalogProducts} onSave={(v) => save('catalogProducts', v)} onDuplicate={(p) => { setDuplicateProduct(p); navigate(`${ADMIN_PATH}/products/new`) }} />
+              <ProductsTab products={db.catalogProducts} categories={db.categories} onSave={(v) => save('catalogProducts', v)} onDuplicate={(p) => { setDuplicateProduct(p); navigate(`${ADMIN_PATH}/products/new`) }} />
             )}
             {tab === 'customers' && (
               <CustomersTab university={selectedUni} role={role} />
@@ -1121,13 +1121,30 @@ function ProductForm({ initial, categories, onSave, onCancel }) {
   )
 }
 
-function ProductsTab({ products, onSave, onDuplicate }) {
+function ProductsTab({ products, categories, onSave, onDuplicate }) {
   const [query, setQuery] = useState('')
+  const [collapsed, setCollapsed] = useState({})
   const navigate = useNavigate()
 
   const filtered = products.filter((p) =>
     (p.name + ' ' + (p.brand ?? '') + ' ' + p.category).toLowerCase().includes(query.toLowerCase())
   )
+
+  const grouped = {}
+  for (const p of filtered) {
+    const cat = p.category || 'Uncategorized'
+    if (!grouped[cat]) grouped[cat] = []
+    grouped[cat].push(p)
+  }
+
+  const catOrder = categories.filter((c) => c.name !== 'All').map((c) => c.name)
+  const sortedKeys = Object.keys(grouped).sort((a, b) => {
+    const ai = catOrder.indexOf(a)
+    const bi = catOrder.indexOf(b)
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+  })
+
+  const toggle = (cat) => setCollapsed((prev) => ({ ...prev, [cat]: !prev[cat] }))
 
   const removeProduct = async (id) => {
     if (!confirm('Delete this product?')) return
@@ -1136,6 +1153,8 @@ function ProductsTab({ products, onSave, onDuplicate }) {
       onSave(products.filter((p) => p.id !== id))
     }
   }
+
+  const catMeta = (name) => categories.find((c) => c.name === name) || { icon: '📦', name }
 
   return (
     <div>
@@ -1150,31 +1169,56 @@ function ProductsTab({ products, onSave, onDuplicate }) {
           </button>
         </div>
         <input className="search-box" type="text" placeholder="Search products…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        {filtered.length === 0 ? (
+        {sortedKeys.length === 0 ? (
           <p className="muted">No products match your search.</p>
         ) : (
-          <table className="admin-table">
-            <thead>
-              <tr><th></th><th>Name</th><th>Category</th><th>Price</th><th>Qty</th><th>Rating</th><th></th></tr>
-            </thead>
-            <tbody>
-              {filtered.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.image && <img src={p.image} alt="" />}</td>
-                  <td><strong>{p.name}</strong>{p.outOfStock ? <span style={{ color: '#dc2626', fontSize: '0.75rem', fontWeight: 700, marginLeft: '6px' }}>OUT OF STOCK</span> : null}{p.brand ? <div className="muted">{p.brand}{p.subcategory ? ` · ${p.subcategory}` : ''}</div> : null}</td>
-                  <td>{p.category}</td>
-                  <td>{p.price}</td>
-                  <td>{p.quantity ?? 0}</td>
-                  <td>★ {p.rating}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button type="button" className="btn ghost small" onClick={() => onDuplicate(p)}>Duplicate</button>{' '}
-                    <button type="button" className="btn ghost small" onClick={() => navigate(`${ADMIN_PATH}/products/${p.id}/edit`)}>Edit</button>{' '}
-                    <button type="button" className="btn danger small" onClick={() => removeProduct(p.id)}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          sortedKeys.map((cat) => {
+            const items = grouped[cat]
+            const meta = catMeta(cat)
+            const isCollapsed = collapsed[cat]
+            return (
+              <div key={cat} style={{ marginBottom: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => toggle(cat)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                    padding: '10px 14px', borderRadius: '8px', cursor: 'pointer',
+                    border: '1px solid var(--border)', background: 'var(--card)',
+                    fontWeight: 600, fontSize: '0.95rem', textAlign: 'left',
+                  }}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>{meta.icon}</span>
+                  <span>{cat}</span>
+                  <span className="muted" style={{ marginLeft: '4px', fontWeight: 400, fontSize: '0.8rem' }}>({items.length})</span>
+                  <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isCollapsed ? '▶' : '▼'}</span>
+                </button>
+                {!isCollapsed && (
+                  <table className="admin-table" style={{ marginTop: '4px' }}>
+                    <thead>
+                      <tr><th></th><th>Name</th><th>Price</th><th>Qty</th><th>Rating</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                      {items.map((p) => (
+                        <tr key={p.id}>
+                          <td>{p.image && <img src={p.image} alt="" />}</td>
+                          <td><strong>{p.name}</strong>{p.outOfStock ? <span style={{ color: '#dc2626', fontSize: '0.75rem', fontWeight: 700, marginLeft: '6px' }}>OUT OF STOCK</span> : null}{p.brand ? <div className="muted">{p.brand}{p.subcategory ? ` · ${p.subcategory}` : ''}</div> : null}</td>
+                          <td>{p.price}</td>
+                          <td>{p.quantity ?? 0}</td>
+                          <td>★ {p.rating}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button type="button" className="btn ghost small" onClick={() => onDuplicate(p)}>Duplicate</button>{' '}
+                            <button type="button" className="btn ghost small" onClick={() => navigate(`${ADMIN_PATH}/products/${p.id}/edit`)}>Edit</button>{' '}
+                            <button type="button" className="btn danger small" onClick={() => removeProduct(p.id)}>Delete</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )
+          })
         )}
       </div>
     </div>
