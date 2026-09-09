@@ -34,13 +34,13 @@ dist/          → Vite build output (production)
 ## Key Files
 
 ### Backend (`server/`)
-- `index.js` — Express app, route mounting, admin sessions, middleware, rate limiters with custom `keyGenerator`
+- `index.js` — Express app, route mounting, admin sessions (DB-backed), middleware, rate limiters with custom `keyGenerator`, timing-safe password comparison
 - `db.js` — PostgreSQL pool, schema init, auto-migrations
 - `auth.js` — User registration, login, email verification, password reset
 - `helpers.js` — Shared utilities: `hashPassword`, `verifyPassword`, `requireUser`, `getNotifyEmail`
 - `payments.js` — Lipana SDK wrapper (per-university), phone normalization, webhook signature verification
-- `payment-routes.js` — Payment HTTP routes (STK push, webhook, admin config)
-- `orders.js` — Order placement, status updates, stock deduction/restore helpers, admin/customer email + Telegram notifications
+- `payment-routes.js` — Payment HTTP routes (STK push, webhook, admin config) with mandatory signature verification
+- `orders.js` — Order placement (transactional with SELECT FOR UPDATE), status updates, stock deduction/restore helpers (transaction-aware), admin/customer email + Telegram notifications
 - `cart.js` — Per-user cart CRUD
 - `email.js` — Resend email service (auto display name, plain text fallback, auto reply-to)
 - `telegram.js` — Telegram bot notifications per university
@@ -120,11 +120,13 @@ Configured via admin panel (requires super user password to save).
 
 ## Database Schema
 
-9 tables: `users`, `sessions`, `carts`, `orders`, `products`, `universities`, `site_data`, `tokens`, `daily_sales`
+10 tables: `users`, `sessions`, `carts`, `orders`, `products`, `universities`, `site_data`, `tokens`, `daily_sales`, `admin_sessions`
 
 Universities table columns include: `name`, `slug`, `email` (sender address), `notify_email` (admin alerts), `lipana_*` (payment), `telegram_*` (notifications).
 
-Migrations run automatically via `ALTER TABLE ADD COLUMN IF NOT EXISTS` in `db.js`.
+`admin_sessions` stores admin login sessions with automatic expiry (survives server restarts).
+
+Migrations run automatically via `ALTER TABLE ADD COLUMN IF NOT EXISTS` and `CREATE TABLE/INDEX IF NOT EXISTS` in `db.js`.
 
 ## Admin Panel
 
@@ -133,6 +135,13 @@ Located at secret URL (`/admin-7f3k9`). Two roles:
 - **Sub-user** (university admin) — scoped to their university, can see till number but NOT API keys
 
 Sensitive config (Telegram bot token, chat ID) requires super user password to save.
+
+Admin sessions are stored in the `admin_sessions` DB table (survives server restarts, auto-expire).
+
+Features:
+- Products tab: category dropdown filter with icon + count, search by name/brand/category
+- Customers tab: search bar (name, email, phone)
+- Orders tab: "Mark as Paid" button disabled on canceled orders
 
 ## Environment Variables
 
@@ -222,7 +231,7 @@ pm2 stop lacosta-api    # Stop app
 - Dark mode via `data-theme` attribute on `<html>`
 - State managed via React Context (`AuthContext`, `CartContext`)
 - Server uses Express 5 (not 4) — `app.use()` returns promises
-- University scoping: most queries filter by `university` column
+- University scoping: most queries filter by `university` column; products filtered by university when logged in, all visible when not logged in
 - Real-time sync: frontend polls `/api/data` every 5s, stock every 10s
 - Rate limiters use custom `keyGenerator` to handle proxied IPs (Cloudflare/Nginx)
 - User data isolation: localStorage keys are scoped by user ID (`lacosta-cart-{userId}`, `lacosta_history-{userId}`) to prevent cross-user data leakage when switching accounts
@@ -236,10 +245,8 @@ pm2 stop lacosta-api    # Stop app
 ## Known Issues
 
 - **Kenyan ISP routing**: Some ISPs cannot route directly to Hostinger VPS IP `72.62.132.86`. Cloudflare proxy is configured but may require DNS flush on client devices. Cloudflare tunnel (`cloudflared`) works as fallback.
-- **Admin panel at 2,459 lines**: Single file (`Admin.jsx`) with 16 components — should be split into separate files.
+- Admin panel at ~2700 lines: Single file (`Admin.jsx`) with 16 components — should be split into separate files.
 - **No 404 route**: Missing catch-all route in `App.jsx`.
 - **No pagination**: Products, orders, customers all load as flat lists.
 - **Hardcoded default passwords**: `config.js` defaults `adminPassword` to `'lacosta-admin'` and `superUserPassword` to `'qazwsxedc'` — must be overridden via env vars in production.
 - **Code duplication**: `hashPassword`/`verifyPassword` duplicated in `index.js` and `auth.js`; `requireUser` middleware triplicated across `cart.js`, `orders.js`, `payment-routes.js`; `getNotifyEmail` duplicated in `orders.js` and `payment-routes.js`; `categorySlug()` hardcoded in `Header.jsx`, `Category.jsx`, `Admin.jsx`.
-- **In-memory sessions**: Admin sessions (`Set`) are lost on server restart and have no expiration.
-- **Webhook idempotency**: Stock deduction in the payment webhook has no guard against duplicate deliveries — retries could deduct stock twice.
