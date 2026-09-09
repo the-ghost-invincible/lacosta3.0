@@ -996,28 +996,14 @@ function ProductForm({ initial, categories, onSave, onCancel }) {
           <label>Name</label>
           <input value={product.name} onChange={(e) => set('name', e.target.value)} />
         </div>
-        <div className="form-field full">
+        <div className="form-field">
           <label>Category</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+          <select value={product.category} onChange={(e) => set('category', e.target.value)}>
+            <option value="">— choose —</option>
             {categories.filter((c) => c.name !== 'All').map((c) => (
-              <button
-                key={c.name}
-                type="button"
-                onClick={() => set('category', c.name)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '8px 14px', borderRadius: '8px', cursor: 'pointer',
-                  border: product.category === c.name ? '2px solid #65a30d' : '1px solid var(--border)',
-                  background: product.category === c.name ? '#f0fdf4' : 'var(--card)',
-                  fontWeight: product.category === c.name ? '600' : '400',
-                  fontSize: '0.85rem', transition: 'all 0.15s',
-                }}
-              >
-                <span style={{ fontSize: '1.1rem' }}>{c.icon}</span>
-                {c.name}
-              </button>
+              <option key={c.name} value={c.name}>{c.name}</option>
             ))}
-          </div>
+          </select>
         </div>
         <div className="form-field">
           <label>Brand (optional)</label>
