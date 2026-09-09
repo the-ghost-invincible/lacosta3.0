@@ -1163,7 +1163,7 @@ function ProductsTab({ products, categories, onSave, onDuplicate }) {
           <select
             value={catFilter}
             onChange={(e) => setCatFilter(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', fontSize: '0.85rem', minWidth: '160px' }}
+            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: '0.85rem', minWidth: '160px' }}
           >
             <option value="All">All categories ({products.length})</option>
             {categories.filter((c) => c.name !== 'All').map((c) => (
