@@ -17,7 +17,10 @@ async function getTelegramConfig(university) {
 
 export async function sendTelegram(message, university) {
   const cfg = await getTelegramConfig(university)
-  if (!cfg) return
+  if (!cfg) {
+    console.log(`[telegram] Skipped — no config for university "${university}"`)
+    return
+  }
   try {
     const url = `https://api.telegram.org/bot${cfg.botToken}/sendMessage`
     const res = await fetch(url, {
@@ -32,6 +35,8 @@ export async function sendTelegram(message, university) {
     if (!res.ok) {
       const err = await res.text()
       console.error('[telegram] Send failed:', err)
+    } else {
+      console.log(`[telegram] Sent to ${university} (chat: ${cfg.chatId})`)
     }
   } catch (err) {
     console.error('[telegram] Error:', err.message)
