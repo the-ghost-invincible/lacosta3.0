@@ -16,6 +16,8 @@ export function LoginPage() {
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [needsVerify, setNeedsVerify] = useState(false)
   const [resendMsg, setResendMsg] = useState(null)
   const [resendBusy, setResendBusy] = useState(false)
@@ -94,6 +96,8 @@ export function LoginPage() {
     setPassword('')
     setConfirm('')
     setUniversity('')
+    setShowPassword(false)
+    setShowConfirm(false)
   }
 
   return (
@@ -143,13 +147,24 @@ export function LoginPage() {
 
             <label className="form-field">
               <span>Password</span>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === 'register' ? 'At least 6 characters' : 'Your password'}
-                required
-              />
+              <div className="password-input-wrap">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={mode === 'register' ? 'At least 6 characters' : 'Your password'}
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? '🙈' : '👁'}
+                </button>
+              </div>
             </label>
 
             {mode === 'login' && !notice && (
@@ -176,13 +191,24 @@ export function LoginPage() {
 
                 <label className="form-field">
                   <span>Confirm password</span>
-                  <input
-                    type="password"
-                    value={confirm}
-                    onChange={(e) => setConfirm(e.target.value)}
-                    placeholder="Repeat your password"
-                    required
-                  />
+                  <div className="password-input-wrap">
+                    <input
+                      type={showConfirm ? 'text' : 'password'}
+                      value={confirm}
+                      onChange={(e) => setConfirm(e.target.value)}
+                      placeholder="Repeat your password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowConfirm((v) => !v)}
+                      tabIndex={-1}
+                      aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                    >
+                      {showConfirm ? '🙈' : '👁'}
+                    </button>
+                  </div>
                 </label>
               </>
             )}
