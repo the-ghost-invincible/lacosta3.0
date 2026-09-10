@@ -147,89 +147,89 @@ orderRouter.post('/', requireUser, async (req, res) => {
     client.release()
   }
 
-  // Notifications AFTER commit (no need to hold the lock)
-  await trackDailySale(order, false)
+  try {
+    await trackDailySale(order, false)
 
-  // Send order confirmation email
-  const itemsList = items.map(i =>
-    `<tr>
-      <td style="padding:8px;border-bottom:1px solid #eee">${i.name}</td>
-      <td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.qty ?? 1}</td>
-      <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${i.price}</td>
-    </tr>`
-  ).join('')
+    const itemsList = items.map(i =>
+      `<tr>
+        <td style="padding:8px;border-bottom:1px solid #eee">${i.name}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.qty ?? 1}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${i.price}</td>
+      </tr>`
+    ).join('')
 
-  sendEmail({
-    to: req.user.email,
-    subject: `Order #${order.id} received — Lacosta`,
-    university: req.user.university,
-    html: `
-      <div style="padding:40px 32px;">
-        <div style="text-align:center;margin-bottom:24px;">
-          <img src="${config.baseUrl}/logo.png" alt="Lacosta" width="48" height="48" style="border-radius:12px;">
-        </div>
-        <h2 style="font-size:22px;font-weight:700;color:#1a1a1a;margin:0 0 8px;text-align:center;">Order confirmed!</h2>
-        <p style="font-size:15px;color:#52525b;margin:0 0 24px;text-align:center;">Hi ${name}, we've received your order <strong>#${order.id}</strong>.</p>
-        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
-          <thead>
-            <tr style="background:#f5f5f5;">
-              <th style="padding:10px 12px;text-align:left;font-size:13px;color:#71717a;">Item</th>
-              <th style="padding:10px 12px;text-align:center;font-size:13px;color:#71717a;">Qty</th>
-              <th style="padding:10px 12px;text-align:right;font-size:13px;color:#71717a;">Price</th>
-            </tr>
-          </thead>
-          <tbody>${itemsList}</tbody>
-        </table>
-        <p style="font-size:18px;text-align:center;margin:24px 0;"><strong>Total: ${order.total}</strong></p>
-        <p style="font-size:14px;color:#52525b;text-align:center;">We'll contact you at <strong>${phone}</strong> to confirm delivery.</p>
-        <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0;">
-        <p style="font-size:13px;color:#a1a1aa;text-align:center;margin:0;">Questions? Reply to this email or call 0112974286.</p>
-      </div>
-    `,
-  }).catch(() => {})
-
-  // Send notification to admin
-  const notifyTo = await getNotifyEmail(req.user.university)
-  console.log(`[order-notify] Order #${order.id} | Uni: ${req.user.university} | Notify to: ${notifyTo}`)
-  if (notifyTo) {
     sendEmail({
-      to: notifyTo,
-      subject: `🛒 New Order #${order.id} — KSh ${total.toLocaleString()}`,
+      to: req.user.email,
+      subject: `Order #${order.id} received — Lacosta`,
       university: req.user.university,
       html: `
-        <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-          <h2 style="color:#65a30d">New order received!</h2>
-          <p><strong>Order #${order.id}</strong></p>
-          <p><strong>Customer:</strong> ${name} (${req.user.email})</p>
-          <p><strong>Phone:</strong> ${phone}</p>
-          <table style="width:100%;border-collapse:collapse;margin:16px 0">
+        <div style="padding:40px 32px;">
+          <div style="text-align:center;margin-bottom:24px;">
+            <img src="${config.baseUrl}/logo.png" alt="Lacosta" width="48" height="48" style="border-radius:12px;">
+          </div>
+          <h2 style="font-size:22px;font-weight:700;color:#1a1a1a;margin:0 0 8px;text-align:center;">Order confirmed!</h2>
+          <p style="font-size:15px;color:#52525b;margin:0 0 24px;text-align:center;">Hi ${name}, we've received your order <strong>#${order.id}</strong>.</p>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0;">
             <thead>
-              <tr style="background:#f5f5f5">
-                <th style="padding:8px;text-align:left">Item</th>
-                <th style="padding:8px;text-align:center">Qty</th>
-                <th style="padding:8px;text-align:right">Price</th>
+              <tr style="background:#f5f5f5;">
+                <th style="padding:10px 12px;text-align:left;font-size:13px;color:#71717a;">Item</th>
+                <th style="padding:10px 12px;text-align:center;font-size:13px;color:#71717a;">Qty</th>
+                <th style="padding:10px 12px;text-align:right;font-size:13px;color:#71717a;">Price</th>
               </tr>
             </thead>
             <tbody>${itemsList}</tbody>
           </table>
-          <p style="font-size:18px"><strong>Total: ${order.total}</strong></p>
-          <p><a href="${config.baseUrl}" style="color:#65a30d">View in admin panel →</a></p>
+          <p style="font-size:18px;text-align:center;margin:24px 0;"><strong>Total: ${order.total}</strong></p>
+          <p style="font-size:14px;color:#52525b;text-align:center;">We'll contact you at <strong>${phone}</strong> to confirm delivery.</p>
+          <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0;">
+          <p style="font-size:13px;color:#a1a1aa;text-align:center;margin:0;">Questions? Reply to this email or call 0112974286.</p>
         </div>
       `,
     }).catch(() => {})
-  }
 
-  // Send Telegram notification to admin
-  const tgItems = items.map(i => `• ${i.name} × ${i.qty ?? 1}`).join('\n')
-  sendTelegram(
-    `<b>🛒 New Order #${order.id}</b>\n\n` +
-    `<b>Customer:</b> ${name} (${req.user.email})\n` +
-    `<b>Phone:</b> ${phone}\n` +
-    `<b>Items:</b>\n${tgItems}\n\n` +
-    `<b>Total:</b> ${order.total}\n` +
-    `<b>University:</b> ${req.user.university || 'default'}`,
-    req.user.university
-  )
+    const notifyTo = await getNotifyEmail(req.user.university)
+    console.log(`[order-notify] Order #${order.id} | Uni: ${req.user.university} | Notify to: ${notifyTo}`)
+    if (notifyTo) {
+      sendEmail({
+        to: notifyTo,
+        subject: `🛒 New Order #${order.id} — KSh ${total.toLocaleString()}`,
+        university: req.user.university,
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+            <h2 style="color:#65a30d">New order received!</h2>
+            <p><strong>Order #${order.id}</strong></p>
+            <p><strong>Customer:</strong> ${name} (${req.user.email})</p>
+            <p><strong>Phone:</strong> ${phone}</p>
+            <table style="width:100%;border-collapse:collapse;margin:16px 0">
+              <thead>
+                <tr style="background:#f5f5f5">
+                  <th style="padding:8px;text-align:left">Item</th>
+                  <th style="padding:8px;text-align:center">Qty</th>
+                  <th style="padding:8px;text-align:right">Price</th>
+                </tr>
+              </thead>
+              <tbody>${itemsList}</tbody>
+            </table>
+            <p style="font-size:18px"><strong>Total: ${order.total}</strong></p>
+            <p><a href="${config.baseUrl}" style="color:#65a30d">View in admin panel →</a></p>
+          </div>
+        `,
+      }).catch(() => {})
+    }
+
+    const tgItems = items.map(i => `• ${i.name} × ${i.qty ?? 1}`).join('\n')
+    sendTelegram(
+      `<b>🛒 New Order #${order.id}</b>\n\n` +
+      `<b>Customer:</b> ${name} (${req.user.email})\n` +
+      `<b>Phone:</b> ${phone}\n` +
+      `<b>Items:</b>\n${tgItems}\n\n` +
+      `<b>Total:</b> ${order.total}\n` +
+      `<b>University:</b> ${req.user.university || 'default'}`,
+      req.user.university
+    )
+  } catch (postErr) {
+    console.error('Post-commit order notifications failed:', postErr.message)
+  }
 
   res.json({ ok: true, order })
 })
