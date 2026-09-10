@@ -149,7 +149,11 @@ orderRouter.post('/', requireUser, async (req, res) => {
 
   try {
     await trackDailySale(order, false)
+  } catch (err) {
+    console.error('trackDailySale failed:', err.message)
+  }
 
+  try {
     const itemsList = items.map(i =>
       `<tr>
         <td style="padding:8px;border-bottom:1px solid #eee">${i.name}</td>
@@ -216,7 +220,11 @@ orderRouter.post('/', requireUser, async (req, res) => {
         `,
       }).catch(() => {})
     }
+  } catch (err) {
+    console.error('Order email notifications failed:', err.message)
+  }
 
+  try {
     const tgItems = items.map(i => `• ${i.name} × ${i.qty ?? 1}`).join('\n')
     sendTelegram(
       `<b>🛒 New Order #${order.id}</b>\n\n` +
@@ -227,8 +235,8 @@ orderRouter.post('/', requireUser, async (req, res) => {
       `<b>University:</b> ${req.user.university || 'default'}`,
       req.user.university
     )
-  } catch (postErr) {
-    console.error('Post-commit order notifications failed:', postErr.message)
+  } catch (err) {
+    console.error('Order Telegram notification failed:', err.message)
   }
 
   res.json({ ok: true, order })
