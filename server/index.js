@@ -667,13 +667,23 @@ app.put('/api/admin/universities/:slug/telegram', requireAnyAdmin, async (req, r
     return res.status(403).json({ error: 'Access denied' })
   }
   const { botToken, chatId, password } = req.body ?? {}
-  if (!password || password !== config.superUserPassword) {
+  if (!password || !safeCompare(password, config.superUserPassword)) {
     return res.status(403).json({ error: 'Incorrect super user password' })
   }
   try {
+    const existing = await pool.query(
+      'SELECT telegram_bot_token, telegram_chat_id FROM universities WHERE slug = $1',
+      [slug]
+    )
+    if (existing.rowCount === 0) {
+      return res.status(404).json({ error: 'University not found' })
+    }
+    const row = existing.rows[0]
+    const newToken = botToken !== undefined ? (botToken || null) : row.telegram_bot_token
+    const newChatId = chatId !== undefined ? (chatId || null) : row.telegram_chat_id
     await pool.query(
       'UPDATE universities SET telegram_bot_token = $1, telegram_chat_id = $2 WHERE slug = $3',
-      [botToken || null, chatId || null, slug]
+      [newToken, newChatId, slug]
     )
     res.json({ ok: true })
   } catch (err) {
